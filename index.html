@@ -1327,7 +1327,14 @@ function openMenu(){
     if(m==='visited'){ S.showVisited=!S.showVisited; save(); render(); openMenu(); }
     if(m==='zones') openZoneForm();
     if(m==='ruta') openAjustesRuta();
-    if(m==='reset' && confirm('¿Volver a mostrar todos los clientes como pendientes?')){ S.clients.forEach(c=>{c.visitado=null;c.visitFecha=null;}); save(); render(); closeSheet(); toast('Visitas reiniciadas'); }
+    if(m==='reset' && confirm('¿Volver a mostrar todos los clientes como pendientes? El historial de visitas no se borra.')){
+      S.reinicio = Date.now();
+      S.outbox = S.outbox||[];
+      S.outbox = S.outbox.filter(o=>o.tipo!=='reinicio');
+      S.outbox.push({id:uid(), tipo:'reinicio', ts:S.reinicio});
+      S.clients.forEach(c=>{c.visitado=null;c.visitFecha=null;});
+      save(); render(); closeSheet(); toast('Visitas reiniciadas'); if(S.scriptUrl) flushOutbox(true);
+    }
     if(m==='export') exportJson();
     if(m==='restore') document.getElementById('fileJson').click();
     if(m==='wipe' && confirm('¿Borrar todos los clientes? Descargá un respaldo antes si lo necesitás.')){ S.clients=[]; UI.zone='all'; save(); render(); openEmpty(); }
@@ -1644,7 +1651,8 @@ function sheetCsvUrls(u){
 function tsRegistro(r){ const t=fechaTs(r.fecha); const hm=String(r.hora||'').match(/(\d{1,2}):(\d{2})/); return t + (hm ? (+hm[1]*60 + +hm[2])*60000 : 0); }
 function applyRegistro(filas){
   const now=new Date(), mk=monthKey();
-  const mes = filas.filter(r=>{ const t=fechaTs(r.fecha); if(!t) return false; const d=new Date(t); return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth(); });
+  const corte = Math.floor((S.reinicio||0)/60000)*60000;
+  const mes = filas.filter(r=>{ const t=fechaTs(r.fecha); if(!t) return false; const d=new Date(t); return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth() && tsRegistro(r)>=corte; });
   S.outbox = S.outbox||[];
   // Primera vez: subir las visitas del mes que este dispositivo tenía y la planilla no
   if(!S.visitasMigradas){
@@ -1703,6 +1711,8 @@ async function leerDesdeScript(silent){
     const j = await (await fetch(S.scriptUrl+(S.scriptUrl.includes('?')?'&':'?')+'accion=todo',{cache:'no-store'})).json();
     if(!j.ok){ if(!silent) toast('La planilla respondió con un error: '+(j.error||'')); return null; }
     const visitas = j.visitas||[];
+    const pendR = (S.outbox||[]).some(o=>o.tipo==='reinicio');
+    if(!pendR && j.reinicio!=null) S.reinicio = Math.max(Number(j.reinicio)||0, 0);
     return {incoming: clientesDeScript(j.clientes||[], visitas), filas: visitas};
   }catch(e){ if(!silent) toast('No pude conectar con la planilla. Revisá la señal.'); return null; }
 }
@@ -1889,6 +1899,11 @@ async function flushOutbox(silent){
       save();
     }
     // 3) Registro de visitas
+    for(const it of S.outbox.filter(o=>o.tipo==='reinicio')){
+      const j = await postScript(it);
+      if(j.ok){ quitar(it); ok++; } else fallo++;
+      save();
+    }
     const regs = S.outbox.filter(o=>o.tipo==='visita'||o.tipo==='desvisita');
     if(regs.length){
       const j = await postScript({tipo:'registro_lote', items:regs});

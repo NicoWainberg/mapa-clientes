@@ -11,6 +11,8 @@
  *  - "alta": cliente nuevo (si no tiene código, se le asigna SC-001, SC-002…)
  *  - "lote" / "edicion": cambios de datos, ubicación, zona y estado
  *  - "registro_lote" / "visita" / "desvisita": visitas y resúmenes
+ *  - "reinicio": fecha de corte de "Reiniciar visitas del mes" (las visitas anteriores
+ *    dejan de contar como visitadas, pero quedan en el historial)
  */
 const H_CLIENTES = 'Clientes', H_VISITAS = 'Visitas', H_MAPA = 'Mapa';
 const COLS_CLIENTES = ['Código', 'Nombre', 'Dirección', 'Teléfono', 'Contacto', 'Rubro', 'Comentarios', 'Horario', 'Zona', 'Estado', 'Última visita', 'Último resumen'];
@@ -25,7 +27,7 @@ function doGet(e) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     estructura(ss);
-    if (p.accion === 'todo') return out({ ok: true, clientes: leerClientes(ss), visitas: leerVisitas(ss) });
+    if (p.accion === 'todo') return out({ ok: true, clientes: leerClientes(ss), visitas: leerVisitas(ss), reinicio: Number(PropertiesService.getScriptProperties().getProperty('reinicio') || 0) });
     if (p.accion === 'registro') return out({ ok: true, filas: leerVisitas(ss) });
     return out({ ok: true, msg: 'Conectado' });
   } catch (err) {
@@ -71,6 +73,7 @@ function doPost(e) {
     estructura(ss);
     let r;
     if (d.tipo === 'alta') r = alta(ss, d);
+    else if (d.tipo === 'reinicio') { PropertiesService.getScriptProperties().setProperty('reinicio', String(Number(d.ts) || Date.now())); r = { ok: true }; }
     else if (d.tipo === 'lote') r = { ok: true, res: aplicarLote(ss, d.items || []) };
     else if (d.tipo === 'edicion') r = aplicarLote(ss, [{ orig: d.orig, campos: d.campos }])[0];
     else if (d.tipo === 'registro_lote') { (d.items || []).forEach(it => registrar(ss, it)); r = { ok: true }; }
