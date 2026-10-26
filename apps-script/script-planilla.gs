@@ -13,10 +13,18 @@
  *  - "registro_lote" / "visita" / "desvisita": visitas y resúmenes
  *  - "reinicio": fecha de corte de "Reiniciar visitas del mes" (las visitas anteriores
  *    dejan de contar como visitadas, pero quedan en el historial)
+ *  - "cobrada": marca o desmarca una factura como cobrada (hoja Cobradas)
+ *
+ * Cobranzas: actualizarDeudas() entra al sistema de la empresa con el usuario y la clave
+ * guardados en las propiedades del script (SISTEMA_USUARIO y SISTEMA_CLAVE), trae la cuenta
+ * de cada cliente y la guarda en la hoja Deudas. Se ejecuta cada mañana (ver
+ * instalarActualizacionDiaria) y también desde el botón "Actualizar" de la app.
  */
 const H_CLIENTES = 'Clientes', H_VISITAS = 'Visitas', H_MAPA = 'Mapa';
-const COLS_CLIENTES = ['Código', 'Nombre', 'Dirección', 'Teléfono', 'Contacto', 'Rubro', 'Comentarios', 'Horario', 'Zona', 'Estado', 'Última visita', 'Último resumen'];
-const CAMPO_COL = { codigo: 'codigo', nombre: 'nombre', direccion: 'direccion', telefono: 'telefono', contacto: 'contacto', rubro: 'rubro', notas: 'comentarios', horario: 'horario', zona: 'zona', estado: 'estado' };
+const COLS_CLIENTES = ['Código', 'Nombre', 'Dirección', 'Teléfono', 'Contacto', 'Rubro', 'Comentarios', 'Horario', 'Plazo de pago', 'Medio de pago', 'Zona', 'Estado', 'Deuda', 'Última visita', 'Último resumen'];
+const CAMPO_COL = { codigo: 'codigo', nombre: 'nombre', direccion: 'direccion', telefono: 'telefono', contacto: 'contacto', rubro: 'rubro', notas: 'comentarios', horario: 'horario', plazo: 'plazo de pago', medio: 'medio de pago', zona: 'zona', estado: 'estado' };
+const H_DEUDAS = 'Deudas', H_COBRADAS = 'Cobradas';
+const SISTEMA = 'https://tresgeventas.com.ar';
 const COLS_VISITAS = ['Fecha', 'Hora', 'Código', 'Nombre', 'Dirección', 'Zona', 'Resumen'];
 
 /* ================= Lectura ================= */
@@ -27,7 +35,10 @@ function doGet(e) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     estructura(ss);
-    if (p.accion === 'todo') return out({ ok: true, clientes: leerClientes(ss), visitas: leerVisitas(ss), reinicio: Number(PropertiesService.getScriptProperties().getProperty('reinicio') || 0) });
+    const props = PropertiesService.getScriptProperties();
+    if (p.accion === 'todo') return out({ ok: true, clientes: leerClientes(ss), visitas: leerVisitas(ss), reinicio: Number(props.getProperty('reinicio') || 0),
+      deudas: leerDeudas(ss), cobradas: leerCobradas(ss), deudasAct: Number(props.getProperty('deudasAct') || 0) });
+    if (p.accion === 'actualizarDeudas') return out(actualizarDeudas(ss));
     if (p.accion === 'registro') return out({ ok: true, filas: leerVisitas(ss) });
     return out({ ok: true, msg: 'Conectado' });
   } catch (err) {
@@ -41,7 +52,7 @@ function leerClientes(ss) {
   const cl = ss.getSheetByName(H_CLIENTES);
   const data = cl.getDataRange().getDisplayValues();
   const head = data[0].map(norm);
-  const conocidas = new Set(Object.values(CAMPO_COL).concat(['ultima visita', 'ultimo resumen']));
+  const conocidas = new Set(Object.values(CAMPO_COL).concat(['ultima visita', 'ultimo resumen', 'deuda']));
   const mapa = {};
   ss.getSheetByName(H_MAPA).getDataRange().getDisplayValues().slice(1)
     .forEach(f => { if (f[0]) mapa[norm(f[0])] = { lat: f[1], lng: f[2] }; });
@@ -73,6 +84,7 @@ function doPost(e) {
     estructura(ss);
     let r;
     if (d.tipo === 'alta') r = alta(ss, d);
+    else if (d.tipo === 'cobrada') r = marcarCobrada(ss, d);
     else if (d.tipo === 'reinicio') { PropertiesService.getScriptProperties().setProperty('reinicio', String(Number(d.ts) || Date.now())); r = { ok: true }; }
     else if (d.tipo === 'lote') r = { ok: true, res: aplicarLote(ss, d.items || []) };
     else if (d.tipo === 'edicion') r = aplicarLote(ss, [{ orig: d.orig, campos: d.campos }])[0];
@@ -80,7 +92,7 @@ function doPost(e) {
     else if (d.tipo === 'visita' || d.tipo === 'desvisita') r = registrar(ss, d);
     else if (d.texto) r = registrar(ss, { tipo: 'visita', fecha: d.fecha, hora: '', codigo: d.codigo, nombre: d.nombre, direccion: d.direccion, resumen: d.texto }); // versiones viejas de la app
     else r = { ok: false, error: 'Pedido desconocido' };
-    if (d.tipo !== 'lote' && d.tipo !== 'edicion') actualizarResumenes(ss);
+    if (d.tipo !== 'lote' && d.tipo !== 'edicion' && d.tipo !== 'cobrada') actualizarResumenes(ss);
     return out(r);
   } catch (err) {
     return out({ ok: false, error: String(err) });
@@ -250,6 +262,23 @@ function actualizarResumenes(ss) {
 function estructura(ss) {
   if (!(ss.getSheetByName(H_CLIENTES) && ss.getSheetByName(H_MAPA) && ss.getSheetByName(H_VISITAS))) migrar(ss);
   asegurarHorario(ss);
+  const cl = ss.getSheetByName(H_CLIENTES);
+  asegurarColumna(cl, 'Plazo de pago', 'horario', '@');
+  asegurarColumna(cl, 'Medio de pago', 'plazo de pago', '@');
+  asegurarColumna(cl, 'Deuda', 'estado', '"$"#,##0.00');
+}
+
+// Agrega una columna en la hoja Clientes si falta, a continuación de otra
+function asegurarColumna(cl, titulo, despuesDe, formato) {
+  const n = cl.getLastColumn();
+  const nh = cl.getRange(1, 1, 1, n).getDisplayValues()[0].map(norm);
+  if (nh.indexOf(norm(titulo)) >= 0) return;
+  const i = nh.indexOf(despuesDe);
+  const pos = i >= 0 ? i + 1 : n;
+  cl.insertColumnsAfter(pos, 1);
+  cl.getRange(1, pos + 1, cl.getMaxRows(), 1).setNumberFormat(formato || '@');
+  cl.getRange(1, pos + 1).setNumberFormat('@').setValue(titulo)
+    .setFontWeight('bold').setBackground('#14313a').setFontColor('#ffffff');
 }
 
 // Separa "Comentarios / Horario" en "Comentarios" y "Horario"
@@ -304,8 +333,8 @@ function migrar(ss) {
   const valores = filas.map((f, r) => {
     const dir = [val(f, i.direccion), val(f, i.localidad)].filter(Boolean).join(', ');
     const est = /oculto/i.test(val(f, i.estado)) ? 'Oculto' : 'Activo';
-    return [todos[r], val(f, i.nombre), dir, val(f, i.telefono), val(f, i.contacto), val(f, i.rubro), val(f, i.notas), '',
-            est === 'Oculto' ? '' : val(f, i.zona), est, '', ''].concat(extras.map(k => val(f, k)));
+    return [todos[r], val(f, i.nombre), dir, val(f, i.telefono), val(f, i.contacto), val(f, i.rubro), val(f, i.notas), '', '', '',
+            est === 'Oculto' ? '' : val(f, i.zona), est, '', '', ''].concat(extras.map(k => val(f, k)));
   });
   cl.getRange(1, 1, valores.length + 1, encab.length).setNumberFormat('@').setValues([encab].concat(valores));
   formatearEncabezado(cl, encab.length);
@@ -350,6 +379,182 @@ function migrar(ss) {
 function formatearEncabezado(sh, n) {
   sh.getRange(1, 1, 1, n).setFontWeight('bold').setBackground('#14313a').setFontColor('#ffffff');
   sh.setFrozenRows(1);
+}
+
+/* ================= Cobranzas ================= */
+function credenciales() {
+  const p = PropertiesService.getScriptProperties();
+  return { usuario: p.getProperty('SISTEMA_USUARIO'), clave: p.getProperty('SISTEMA_CLAVE') };
+}
+function guardarCookies(resp, jar) {
+  const h = resp.getAllHeaders();
+  let sc = h['Set-Cookie'] || h['set-cookie'];
+  if (!sc) return jar;
+  if (!Array.isArray(sc)) sc = [sc];
+  sc.forEach(c => { const kv = String(c).split(';')[0]; const i = kv.indexOf('='); if (i > 0) jar[kv.slice(0, i).trim()] = kv.slice(i + 1).trim(); });
+  return jar;
+}
+function textoCookies(jar) { return Object.keys(jar).map(k => k + '=' + jar[k]).join('; '); }
+
+// Inicia sesión en el sistema y devuelve las cookies de la sesión
+function loginSistema() {
+  const cr = credenciales();
+  if (!cr.usuario || !cr.clave) throw new Error('Falta cargar SISTEMA_USUARIO y SISTEMA_CLAVE en las propiedades del script');
+  const jar = {};
+  guardarCookies(UrlFetchApp.fetch(SISTEMA + '/login', { muteHttpExceptions: true, followRedirects: false }), jar);
+  const r1 = UrlFetchApp.fetch(SISTEMA + '/login', {
+    method: 'post', payload: { name: cr.usuario, pass: cr.clave },
+    headers: { Cookie: textoCookies(jar) }, followRedirects: false, muteHttpExceptions: true
+  });
+  guardarCookies(r1, jar);
+  const h = r1.getAllHeaders(), loc = h['Location'] || h['location'];
+  if (loc) guardarCookies(UrlFetchApp.fetch(/^http/.test(loc) ? loc : SISTEMA + loc, { headers: { Cookie: textoCookies(jar) }, followRedirects: false, muteHttpExceptions: true }), jar);
+  const u = UrlFetchApp.fetch(SISTEMA + '/usuario', { headers: { Cookie: textoCookies(jar), 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }, muteHttpExceptions: true });
+  let j = null; try { j = JSON.parse(u.getContentText()); } catch (e) {}
+  if (!j || !j.clients) throw new Error('No pude iniciar sesión en el sistema: revisá el usuario y la clave');
+  return jar;
+}
+
+// Para probar desde el editor: Ejecutar → probarConexionSistema
+function probarConexionSistema() {
+  loginSistema();
+  Logger.log('Conexión correcta con el sistema');
+}
+
+function fechaSistema(s) {
+  const m = String(s || '').match(/(\d{4})-(\d{2})-(\d{2})/);
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+}
+function fmtFecha(d) { return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd/MM/yyyy'); }
+
+// Trae la cuenta de cada cliente de la hoja Clientes y la guarda en la hoja Deudas
+function actualizarDeudas(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  estructura(ss);
+  const jar = loginSistema(), ck = textoCookies(jar);
+  const cl = ss.getSheetByName(H_CLIENTES);
+  const data = cl.getDataRange().getDisplayValues();
+  const head = data[0].map(norm);
+  const iCod = head.indexOf('codigo'), iNom = head.indexOf('nombre'), iPlazo = head.indexOf('plazo de pago'),
+        iMedio = head.indexOf('medio de pago'), iDeuda = head.indexOf('deuda');
+  const clientes = [];
+  data.slice(1).forEach((f, r) => {
+    const cod = String(f[iCod] || '').trim();
+    if (/^\d+$/.test(cod)) clientes.push({ fila: r + 1, codigo: cod, nombre: f[iNom], plazo: parseInt(f[iPlazo], 10) || 30, medio: iMedio >= 0 ? f[iMedio] : '' });
+  });
+  const pedidos = clientes.map(c => ({ url: SISTEMA + '/clientes/' + c.codigo + '/cuenta', headers: { Cookie: ck, 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }, muteHttpExceptions: true }));
+  const resp = [];
+  for (let i = 0; i < pedidos.length; i += 25) resp.push.apply(resp, UrlFetchApp.fetchAll(pedidos.slice(i, i + 25)));
+
+  const cobradas = {}; leerCobradas(ss).forEach(x => { cobradas[norm(x.codigo) + '|' + x.numero] = true; });
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const filas = [], saldos = {}, vigentes = new Set();
+  let errores = 0, conDeuda = 0;
+  clientes.forEach((c, k) => {
+    let a = null; try { a = JSON.parse(resp[k].getContentText()); } catch (e) {}
+    if (!Array.isArray(a)) { errores++; return; }
+    if (a.length) conDeuda++;
+    saldos[c.fila] = a.length ? (Number(a[0].Saldo) || a.reduce((s, x) => s + (Number(x.Importe) || 0), 0)) : 0;
+    a.forEach(x => {
+      const f = fechaSistema(x.Fecha); if (!f) return;
+      const imp = Number(x.Importe) || 0;
+      const dias = Math.round((hoy - f) / 864e5);
+      const vence = new Date(f.getTime()); vence.setDate(vence.getDate() + c.plazo);
+      const restan = Math.round((vence - hoy) / 864e5);
+      const clave = norm(c.codigo) + '|' + x.NroComprobante;
+      vigentes.add(clave);
+      const estado = imp <= 0 ? 'Crédito' : cobradas[clave] ? 'Cobrada' : restan < 0 ? 'Vencida' : restan <= 3 ? 'Por vencer' : 'Al día';
+      filas.push([c.codigo, c.nombre, x.TipoComprobante || '', x.NroComprobante || '', fmtFecha(f), imp, dias, imp > 0 ? fmtFecha(vence) : '', estado, c.medio]);
+    });
+  });
+
+  // Hoja Deudas
+  let dh = ss.getSheetByName(H_DEUDAS);
+  if (!dh) { dh = ss.insertSheet(H_DEUDAS, Math.min(2, ss.getSheets().length)); }
+  dh.clearContents();
+  const enc = ['Código', 'Nombre', 'Tipo', 'Número', 'Fecha', 'Importe', 'Días', 'Vence', 'Estado', 'Medio de pago'];
+  dh.getRange(1, 1, 1, enc.length).setValues([enc]).setFontWeight('bold').setBackground('#14313a').setFontColor('#ffffff');
+  dh.setFrozenRows(1);
+  if (filas.length) {
+    dh.getRange(2, 1, filas.length, 5).setNumberFormat('@');
+    dh.getRange(2, 8, filas.length, 3).setNumberFormat('@');
+    dh.getRange(2, 1, filas.length, enc.length).setValues(filas);
+    dh.getRange(2, 6, filas.length, 1).setNumberFormat('"$"#,##0.00');
+  }
+
+  // Columna Deuda de Clientes
+  if (iDeuda >= 0 && data.length > 1) {
+    const col = cl.getRange(2, iDeuda + 1, data.length - 1, 1);
+    const v = data.slice(1).map((f, r) => [saldos[r + 1] !== undefined ? saldos[r + 1] : (String(f[iCod]).match(/^\d+$/) ? 0 : '')]);
+    col.setValues(v);
+  }
+
+  // Las marcas de "cobrada" de facturas que ya no figuran se borran
+  const cb = ss.getSheetByName(H_COBRADAS);
+  if (cb && cb.getLastRow() > 1) {
+    const v = cb.getRange(2, 1, cb.getLastRow() - 1, 3).getDisplayValues().filter(f => vigentes.has(norm(f[0]) + '|' + f[1]));
+    cb.getRange(2, 1, cb.getLastRow() - 1, 3).clearContent();
+    if (v.length) cb.getRange(2, 1, v.length, 3).setValues(v);
+  }
+
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('deudasAct', String(Date.now()));
+  return { ok: true, clientes: clientes.length, conDeuda: conDeuda, comprobantes: filas.length, errores: errores };
+}
+
+// Versión para el disparador diario
+function actualizarDeudasProgramado() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(60000);
+  try { actualizarDeudas(); } finally { lock.releaseLock(); }
+}
+
+// Ejecutar UNA vez desde el editor: actualiza las deudas todos los días entre las 6 y las 7
+function instalarActualizacionDiaria() {
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'actualizarDeudasProgramado').forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('actualizarDeudasProgramado').timeBased().everyDays(1).atHour(6).create();
+  Logger.log('Listo: las deudas se actualizan todos los días a la mañana');
+}
+
+function leerDeudas(ss) {
+  const dh = ss.getSheetByName(H_DEUDAS);
+  const out = {};
+  if (dh && dh.getLastRow() > 1) {
+    dh.getRange(2, 1, dh.getLastRow() - 1, 6).getValues().forEach(f => {
+      const k = String(f[0]).trim(); if (!k) return;
+      (out[k] = out[k] || { saldo: 0, items: [] }).items.push({ tipo: String(f[2]), numero: String(f[3]), fecha: f[4] instanceof Date ? fmtFecha(f[4]) : String(f[4]), importe: Number(f[5]) || 0 });
+    });
+  }
+  const cl = ss.getSheetByName(H_CLIENTES);
+  const data = cl.getDataRange().getValues();
+  const head = data[0].map(norm), iCod = head.indexOf('codigo'), iDeuda = head.indexOf('deuda');
+  if (iDeuda >= 0) data.slice(1).forEach(f => { const k = String(f[iCod]).trim(); if (out[k]) out[k].saldo = Number(f[iDeuda]) || 0; });
+  return out;
+}
+
+function hojaCobradas(ss) {
+  let cb = ss.getSheetByName(H_COBRADAS);
+  if (!cb) {
+    cb = ss.insertSheet(H_COBRADAS, ss.getSheets().length);
+    cb.getRange('A:C').setNumberFormat('@');
+    cb.getRange(1, 1, 1, 3).setValues([['Código', 'Número', 'Marcada']]).setFontWeight('bold').setBackground('#14313a').setFontColor('#ffffff');
+    cb.setFrozenRows(1);
+    cb.hideSheet();
+  }
+  return cb;
+}
+function leerCobradas(ss) {
+  const cb = ss.getSheetByName(H_COBRADAS);
+  if (!cb || cb.getLastRow() < 2) return [];
+  return cb.getRange(2, 1, cb.getLastRow() - 1, 3).getDisplayValues().filter(f => f[0]).map(f => ({ codigo: f[0], numero: f[1], marcada: f[2] }));
+}
+function marcarCobrada(ss, d) {
+  const cb = hojaCobradas(ss);
+  const v = cb.getLastRow() > 1 ? cb.getRange(2, 1, cb.getLastRow() - 1, 3).getDisplayValues() : [];
+  const i = v.findIndex(f => norm(f[0]) === norm(d.codigo) && f[1] === d.numero);
+  if (d.valor && i < 0) cb.appendRow([String(d.codigo), String(d.numero), d.marcada || fmtFecha(new Date())]);
+  if (!d.valor && i >= 0) cb.deleteRow(i + 2);
+  return { ok: true };
 }
 
 /* ================= Utilidades ================= */

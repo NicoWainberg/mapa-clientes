@@ -725,7 +725,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .chip.done{opacity:.55}
 
 /* Botones flotantes */
-#fabs{position:fixed;right:12px;bottom:calc(var(--safe-b) + 18px);z-index:450;display:flex;flex-direction:column;gap:10px}
+#fabs{position:fixed;right:12px;bottom:calc(var(--safe-b) + 76px);z-index:450;display:flex;flex-direction:column;gap:10px}
 .fab{width:52px;height:52px;border-radius:16px;border:0;background:var(--card);box-shadow:0 4px 14px rgba(10,30,36,.25);font-size:22px;display:grid;place-items:center}
 .fab.on{background:#2563eb;color:#fff}
 .fab.track{color:#2563eb;box-shadow:0 0 0 2px #2563eb,0 4px 14px rgba(10,30,36,.25)}
@@ -753,8 +753,8 @@ select{width:100%;font:inherit;font-size:16px;padding:11px 12px;border:1.5px sol
 .me{width:18px;height:18px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 6px rgba(37,99,235,.25)}
 
 /* Hoja inferior */
-#sheet{position:fixed;left:0;right:0;bottom:0;z-index:600;background:var(--card);border-radius:20px 20px 0 0;box-shadow:0 -6px 24px rgba(10,30,36,.25);max-height:78vh;display:flex;flex-direction:column;transform:translateY(105%);transition:transform .22s ease;padding-bottom:var(--safe-b)}
-#sheet.open{transform:none}
+#sheet{position:fixed;left:0;right:0;bottom:calc(58px + var(--safe-b));z-index:600;background:var(--card);border-radius:20px 20px 0 0;box-shadow:0 -6px 24px rgba(10,30,36,.25);max-height:calc(80vh - 58px);display:flex;flex-direction:column;transform:translateY(calc(100% + 90px));visibility:hidden;transition:transform .22s ease,visibility 0s .22s}
+#sheet.open{transform:none;visibility:visible;transition:transform .22s ease}
 #sheet .grip{width:42px;height:5px;background:var(--line);border-radius:5px;margin:8px auto 2px;flex:none}
 #sheetBody{overflow-y:auto;padding:6px 18px 18px;-webkit-overflow-scrolling:touch}
 @media (prefers-reduced-motion:reduce){#sheet{transition:none}}
@@ -794,13 +794,106 @@ textarea{min-height:90px;resize:vertical}
 input:focus,textarea:focus,button:focus-visible{outline:3px solid var(--sel);outline-offset:1px}
 
 /* Avisos */
-#toast{position:fixed;left:50%;bottom:calc(var(--safe-b) + 90px);transform:translateX(-50%);z-index:800;background:#14313a;color:#fff;padding:12px 16px;border-radius:12px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.3);display:none;max-width:90vw;text-align:center}
-#banner{position:fixed;left:10px;right:10px;bottom:calc(var(--safe-b) + 18px);z-index:700;background:#14313a;color:#fff;border-radius:14px;padding:12px 14px;display:none;align-items:center;gap:10px;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+#toast{position:fixed;left:50%;bottom:calc(var(--safe-b) + 150px);transform:translateX(-50%);z-index:800;background:#14313a;color:#fff;padding:12px 16px;border-radius:12px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.3);display:none;max-width:90vw;text-align:center}
+#banner{position:fixed;left:10px;right:10px;bottom:calc(var(--safe-b) + 76px);z-index:700;background:#14313a;color:#fff;border-radius:14px;padding:12px 14px;display:none;align-items:center;gap:10px;box-shadow:0 6px 18px rgba(0,0,0,.3)}
 #banner .t{flex:1;font-weight:600}
 #banner button{border:0;border-radius:10px;padding:9px 14px;background:var(--sel);color:#14313a;font-weight:700}
 .empty{padding:20px 4px;text-align:center}
 .empty p{color:var(--ink-2)}
 .leaflet-control-attribution{font-size:10px}
+
+/* Barra inferior */
+#nav{position:fixed;left:0;right:0;bottom:0;z-index:560;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:var(--safe-b);box-shadow:0 -2px 10px rgba(10,30,36,.08)}
+#nav button{flex:1;height:58px;border:0;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:600;color:var(--ink-2);position:relative}
+#nav button[aria-current="page"]{color:var(--ink)}
+#nav button[aria-current="page"]::before{content:"";position:absolute;top:0;left:30%;right:30%;height:3px;border-radius:0 0 3px 3px;background:#14313a}
+@media (prefers-color-scheme:dark){#nav button[aria-current="page"]::before{background:var(--ink)}}
+#navBadge{position:absolute;top:5px;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#c62828;color:#fff;font-size:11px;line-height:18px;text-align:center}
+#navBadge[hidden]{display:none}
+.leaflet-bottom{margin-bottom:calc(58px + var(--safe-b))}
+body.vista-cob #top, body.vista-cob #fabs{display:none}
+/* Colores de cobranzas */
+:root{--venc:#cf3b3b;--pv:#e79a12;--okd:#a7b8c0}
+.s-venc{background:var(--venc)} .s-pv{background:var(--pv)} .s-ok{background:var(--okd)}
+/* Vista Cobranzas */
+#cobView{display:none;position:fixed;left:0;right:0;top:0;bottom:calc(58px + var(--safe-b));z-index:520;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(var(--safe-t) + 14px) 16px 24px}
+body.vista-cob #cobView{display:block}
+.cob-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.cob-head h2{margin:0}
+.cob-head small{color:var(--ink-2);font-size:13px}
+.ibtn.dark{background:#14313a;color:#fff}
+.ibtn[disabled]{opacity:.6}
+@keyframes gira{to{transform:rotate(360deg)}}
+.gira{animation:gira 1s linear infinite}
+@media (prefers-reduced-motion:reduce){.gira{animation:none}}
+.cob-total{background:#14313a;color:#fff;border-radius:16px;padding:16px}
+.cob-total small{opacity:.8;font-size:13px}
+.cob-total>b{display:block;font-family:var(--cond);font-size:34px;line-height:1.1;margin:2px 0 10px}
+.stack,.bar{display:flex;overflow:hidden;border-radius:6px}
+.stack{height:12px;background:rgba(255,255,255,.15)}
+.stack i,.bar i{display:block;height:100%}
+.leyenda{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:13px}
+.leyenda span{display:flex;align-items:center;gap:6px}
+.leyenda i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.leyenda b{font-weight:700}
+.cob-ctrl{margin:14px 0 10px}
+.seg{display:flex;border:1.5px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card)}
+.seg button{flex:1;min-height:42px;border:0;background:none;font-weight:600;font-size:14px;color:var(--ink-2)}
+.seg button+button{border-left:1.5px solid var(--line)}
+.seg button[aria-pressed="true"]{background:#14313a;color:#fff}
+.filtros{display:flex;gap:8px;margin-top:10px;overflow-x:auto;scrollbar-width:none}
+.filtros button{flex:none;border:1.5px solid var(--line);background:var(--card);border-radius:999px;padding:7px 12px;font-weight:600;font-size:14px}
+.filtros button span{font-family:var(--cond);opacity:.7;margin-left:3px}
+.filtros button[aria-pressed="true"]{border-color:#14313a;background:#14313a;color:#fff}
+.score{list-style:none;margin:0;padding:2px 14px;background:var(--card);border-radius:16px}
+.score li{padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.score li:last-child{border-bottom:0}
+.sc-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.sc-nom{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.sc-top b{font-family:var(--cond);font-size:18px;flex:none}
+.bar{height:10px;background:var(--bg);margin:8px 0 6px}
+.sc-sub{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px;color:var(--ink-2)}
+li.venc .sc-est{color:var(--venc);font-weight:700}
+li.pv .sc-est{color:#b86f00;font-weight:700}
+.sc-z::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:5px}
+.cob-vacio{background:var(--card);border-radius:16px;padding:22px 16px;text-align:center;color:var(--ink-2)}
+.cob-vacio.ok b{color:var(--go);font-size:17px}
+/* Ficha: pestañas */
+.tabs{display:flex;gap:4px;background:var(--bg);border-radius:12px;padding:4px;margin:12px 0 6px}
+.tabs button{flex:1;border:0;background:none;border-radius:9px;min-height:40px;font-weight:700;font-size:15px;color:var(--ink-2);display:flex;align-items:center;justify-content:center;gap:6px}
+.tabs button[aria-selected="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.tb{min-width:20px;height:20px;border-radius:10px;font-size:12px;line-height:20px;color:#fff;padding:0 6px}
+.tb.venc{background:var(--venc)} .tb.pv{background:var(--pv)}
+.pages{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;align-items:flex-start;margin:0 -18px}
+.pages::-webkit-scrollbar{display:none}
+.page{flex:0 0 100%;min-width:0;scroll-snap-align:start;padding:0 18px;box-sizing:border-box}
+/* Ficha: cobranzas */
+.cob-saldo{margin-top:8px}
+.cob-saldo small{color:var(--ink-2);font-size:13px;display:block}
+.cob-saldo b{font-family:var(--cond);font-size:32px;line-height:1.15}
+.cob-res{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+.cob-res span{border-radius:999px;padding:4px 10px;font-weight:700;font-size:13px}
+.t-venc{background:#fde7e7;color:#a32020}
+.t-pv{background:#fff1d6;color:#8a5300}
+.t-ok{background:#e3f3e9;color:#155d34}
+@media (prefers-color-scheme:dark){.t-venc{background:#4a1d1d;color:#ffb4b4}.t-pv{background:#4a3410;color:#ffd58a}.t-ok{background:#173a27;color:#9fe0b6}}
+.cob-conf{margin:10px 0 4px}
+.plazo{display:flex;align-items:center;gap:8px}
+.plazo input{width:100px}
+.plazo span{color:var(--ink-2)}
+.comp{list-style:none;margin:6px 0;padding:0}
+.comp li{display:flex;gap:10px;justify-content:space-between;padding:10px 0 10px 12px;border-bottom:1px solid var(--line);border-left:4px solid var(--okd)}
+.comp li.venc{border-left-color:var(--venc)} .comp li.pv{border-left-color:var(--pv)} .comp li.cob{border-left-color:var(--go);opacity:.75} .comp li.cred{border-left-color:#2f6fd6}
+.comp .c1{min-width:0}
+.comp .c1 b{display:block;font-size:15px}
+.comp .c1 small{display:block;color:var(--ink-2);font-size:13px}
+.comp li.venc .est{color:var(--venc);font-weight:700}
+.comp li.pv .est{color:#b86f00;font-weight:700}
+.comp .rev{color:var(--warn)!important;font-weight:600}
+.comp .c2{text-align:right;flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.comp .c2 b{font-family:var(--cond);font-size:17px}
+/* Pin con deuda vencida */
+.dbt{position:absolute;left:19px;top:-5px;width:12px;height:12px;border-radius:50%;background:var(--venc);border:2px solid #fff;z-index:2}
 </style>
 </head>
 <body>
@@ -821,6 +914,8 @@ input:focus,textarea:focus,button:focus-visible{outline:3px solid var(--sel);out
   <div id="chips" role="toolbar" aria-label="Zonas"></div>
 </div>
 
+<div id="cobView" aria-label="Cobranzas"></div>
+<nav id="nav"><button data-v="mapa" aria-current="page"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><line x1="9" y1="4" x2="9" y2="17.5"/><line x1="15" y1="6.5" x2="15" y2="20"/></svg><span>Mapa</span></button><button data-v="cob" aria-current="false"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><line x1="6" y1="9.5" x2="6" y2="14.5"/><line x1="18" y1="9.5" x2="18" y2="14.5"/></svg><span>Cobranzas</span><b id="navBadge" hidden>0</b></button></nav>
 <div id="fabs">
   <button class="fab" id="btnNorth" aria-label="Volver a orientar al norte"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2 L18 13 L13 11 L8 13 Z" fill="#e23d4f"/><path d="M13 24 L8 13 L13 15 L18 13 Z" fill="#9aa7ab"/></svg></button>
   <button class="fab" id="btnMe" aria-label="Mi ubicación"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/><line x1="12" y1="1.5" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="22.5" y2="12"/></svg></button>
@@ -1080,7 +1175,7 @@ function render(){
     const col = v ? '#9aa7ab' : zoneColor(c.zona);
     const html = dim
       ? `<div class="${cls}" style="--c:${col}"><span></span></div>`
-      : `<div class="pw"><div class="${cls}" style="--c:${col}"><span>${label}</span></div>${showLbl?`<div class="lbl" style="--c:${col}"><b style="color:${col}">${esc(codeOf(c))}</b>${esc(c.nombre||'')}</div>`:''}</div>`;
+      : `<div class="pw"><div class="${cls}" style="--c:${col}"><span>${label}</span></div>${(deudaDe(c)||{}).vencido>0?'<i class="dbt" title="Deuda vencida"></i>':''}${showLbl?`<div class="lbl" style="--c:${col}"><b style="color:${col}">${esc(codeOf(c))}</b>${esc(c.nombre||'')}</div>`:''}</div>`;
     const icon = L.divIcon({className:'', html, iconSize: dim?[14,14]:[30,30], iconAnchor: dim?[7,7]:[4,30]});
     // Separar pines con la misma dirección
     const key = c.lat.toFixed(5)+','+c.lng.toFixed(5); const n = seen.get(key)||0; seen.set(key,n+1);
@@ -1146,7 +1241,7 @@ function waPhone(t){ let d=String(t||'').replace(/\D/g,''); if(!d) return ''; d=
 function telHref(t){ return 'tel:'+String(t||'').replace(/[^\d+]/g,''); }
 function navUrl(c){ return `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}&travelmode=driving`; }
 
-function openClient(id){
+function openClient(id, tab){
   const c = S.clients.find(x=>x.id===id); if(!c) return;
   UI.selected = id; render();
   if(located(c)) map.panTo([c.lat,c.lng],{animate:true});
@@ -1156,6 +1251,7 @@ function openClient(id){
   <h2>${esc(c.nombre||'Sin nombre')}</h2>
   <span class="zonetag" style="--c:${zoneColor(c.zona)}"><i></i>${c.baja?'No existe más':c.zona!=null?'Zona '+(c.zona+1):'Sin zona'}${c.rubro?' &nbsp;|&nbsp; '+esc(c.rubro):''}</span>
   <p class="sub">${esc(c.direccion)}${c.localidad?', '+esc(c.localidad):''}${UI.me&&located(c)?` <b>(a ${kmTo(c)})</b>`:''}</p>`;
+  const cab = h; h = '';
   if(v) h += `<div class="done-note">Visitado el ${new Date(c.visitFecha).toLocaleDateString('es-AR',{day:'numeric',month:'numeric'})}</div>`;
   h += `<div class="row">${v
       ? `<button class="btn" data-act="unvisit">Desmarcar visita</button>`
@@ -1173,10 +1269,26 @@ function openClient(id){
   <div class="row"><button class="btn dark" data-act="resumen">Guardar resumen</button></div>`;
   if(c.notas) h += `<h3>Comentarios</h3><div class="notes">${esc(c.notas)}</div>`;
   h += `<div class="row"><button class="btn small" data-act="edit">Editar</button><button class="btn small" data-act="move">Mover pin</button>${!c.baja&&located(c)?'<button class="btn small" data-act="zona">Mover a zona…</button>':''}${c.baja?'<button class="btn small" data-act="alta">Reactivar</button>':'<button class="btn small warn" data-act="baja">No existe más</button>'}</div>`;
+  const dd = deudaDe(c);
+  const badge = dd && dd.alertas>0 ? `<span class="tb ${dd.vencido>0?'venc':'pv'}">${dd.alertas}</span>` : '';
+  h = cab + `<div class="tabs" role="tablist"><button role="tab" data-tab="0">Datos</button><button role="tab" data-tab="1">Cobranzas${badge}</button></div>
+    <div class="pages" id="pages"><section class="page">${h}</section><section class="page" id="pgCob">${cobranzasHtml(c)}</section></div>`;
   openSheet(h);
+  const pages=document.getElementById('pages'), tabs=[...sheetBody.querySelectorAll('[data-tab]')];
+  const marcarTab=i=>{ UI.fichaTab=i; tabs.forEach((t,k)=>t.setAttribute('aria-selected', String(k===i))); };
+  const irTab=(i,suave)=>{ pages.scrollTo({left:i*pages.clientWidth, behavior:suave?'smooth':'auto'}); marcarTab(i); };
+  tabs.forEach(t=>t.onclick=()=>irTab(+t.dataset.tab,true));
+  pages.addEventListener('scroll',()=>{ const i=Math.round(pages.scrollLeft/Math.max(pages.clientWidth,1)); if(i!==UI.fichaTab) marcarTab(i); },{passive:true});
+  marcarTab(tab||0); requestAnimationFrame(()=>irTab(tab||0,false));
+  const bindPlazo=()=>{ const pl=document.getElementById('cobPlazo'); if(pl) pl.onchange=()=>{ const n=parseInt(pl.value,10); c.plazo = n>0 ? String(n) : ''; queueCampos(c,{plazo:c.plazo}); save(); refrescarCob(); toast('Plazo guardado'); }; };
+  const refrescarCob=()=>{ document.getElementById('pgCob').innerHTML=cobranzasHtml(c); bindPlazo(); renderCob(); render();
+    const d2=deudaDe(c), t1=tabs[1]; t1.innerHTML='Cobranzas'+(d2 && d2.alertas>0 ? `<span class="tb ${d2.vencido>0?'venc':'pv'}">${d2.alertas}</span>` : ''); };
+  bindPlazo();
   sheetBody.onclick = e=>{
     const a = e.target.closest('[data-act]'); if(!a) return;
     const act = a.dataset.act;
+    if(act==='medio'){ c.medio = c.medio===a.dataset.v ? '' : a.dataset.v; queueCampos(c,{medio:c.medio}); save(); refrescarCob(); return; }
+    if(act==='cobrada'){ const val=a.dataset.v==='1'; marcarCobrada(c, a.dataset.n, val); refrescarCob(); toast(val?'Marcada como cobrada':'Marca quitada'); return; }
     if(act==='visit'){ refreshRouteStart(); markVisited(c); if(S.scriptUrl) flushOutbox(true); toast('Visitado ✓'); closeSheet(); render(); maybeZoneDone(c.zona); }
     if(act==='unvisit'){ unmarkVisited(c); render(); openClient(c.id); }
     if(act==='edit') openForm(c);
@@ -1701,7 +1813,7 @@ function clientesDeScript(lista, visitas){
   return lista.map(o=>({
     id:uid(), geo:'pending', zona:null, visitado:null, extra:o.extras||{},
     codigo:o.codigo||'', nombre:o.nombre||'', direccion:o.direccion||'', telefono:o.telefono||'',
-    contacto:o.contacto||'', rubro:o.rubro||'', notas:o.notas||'', horario:o.horario||'',
+    contacto:o.contacto||'', rubro:o.rubro||'', notas:o.notas||'', horario:o.horario||'', plazo:o.plazo||'', medio:o.medio||'',
     ultimaVisita: ult.get(norm(o.codigo)) || ult.get('n:'+norm(o.nombre)) || '',
     _lat:o.lat, _lng:o.lng, _zona:o.zona, _estado:o.estado
   }));
@@ -1713,6 +1825,12 @@ async function leerDesdeScript(silent){
     const visitas = j.visitas||[];
     const pendR = (S.outbox||[]).some(o=>o.tipo==='reinicio');
     if(!pendR && j.reinicio!=null) S.reinicio = Math.max(Number(j.reinicio)||0, 0);
+    if(j.deudas){
+      S.deudas=j.deudas; S.deudasAct=Number(j.deudasAct)||0;
+      const cb={}; (j.cobradas||[]).forEach(x=>{ cb[norm(String(x.codigo).trim())+'|'+x.numero]=x.marcada; });
+      (S.outbox||[]).filter(o=>o.tipo==='cobrada').forEach(o=>{ const k=norm(o.codigo)+'|'+o.numero; if(o.valor) cb[k]=o.marcada; else delete cb[k]; });
+      S.cobradas=cb;
+    }
     return {incoming: clientesDeScript(j.clientes||[], visitas), filas: visitas};
   }catch(e){ if(!silent) toast('No pude conectar con la planilla. Revisá la señal.'); return null; }
 }
@@ -1733,8 +1851,9 @@ async function syncSheetInner(silent){
   if(!d) return;
   const firstTime = !S.clients.length;
   const r = mergeIncoming(d.incoming,'sync');
+  if(firstTime && document.getElementById('sheetGo')) closeSheet();
   if(d.filas) applyRegistro(d.filas);
-  S.lastSync = Date.now(); save(); render(); renderTop();
+  S.lastSync = Date.now(); save(); render(); renderTop(); renderCob();
   if(!firstTime && (!silent || r.nuevos || r.quitados)) toast(`${r.nuevos} nuevos, ${r.cambiados} actualizados, ${r.quitados} quitados`);
   if(UI.selected && sheet.classList.contains('open')){ const ta=document.getElementById('resumen'); if(!ta || !ta.value.trim()) openClient(UI.selected); }
   if(S.outbox && S.outbox.length) flushOutbox(true);
@@ -1888,6 +2007,12 @@ async function flushOutbox(silent){
         }
         quitar(it); ok++;
       } else { it.error=j.error||'Error de la planilla'; fallo++; }
+      save();
+    }
+    // Facturas marcadas como cobradas
+    for(const it of S.outbox.filter(o=>o.tipo==='cobrada')){
+      const j = await postScript(it);
+      if(j.ok){ quitar(it); ok++; } else fallo++;
       save();
     }
     // 2) Ediciones, ubicaciones, zonas y estados: todo en un solo envío
@@ -2261,6 +2386,7 @@ function mostrarPlan(){
   s.etas.forEach((e,k)=>{
     const c=pl.P[e.i].c, w=pl.info[e.i].horario;
     let det = w ? 'Horario: '+fmtHorario(w) : 'Sin horario';
+    const ddp=deudaDe(c); if(ddp && ddp.vencido>0) det += ' · Vencido '+plata(ddp.vencido);
     let marca='', extra='';
     if(e.estado==='cerrado'){ marca='<b style="color:var(--warn)">'+(e.llegada>=jornada()[1]-5 ? 'No llegás antes de las '+fmtHM(jornada()[1]) : 'Va a estar cerrado')+'</b>'; extra=`<button class="btn small" data-mv="${c.id}">Pasar a otra zona</button>`; }
     else if(e.espera>=5) marca=`<b style="color:var(--warn)">Espera ${Math.round(e.espera)} min (abre ${fmtHM(e.llegada+e.espera)})</b>`;
@@ -2289,6 +2415,158 @@ function mostrarPlan(){
       calcularPlan(pl.par); return;
     }
     const li=e.target.closest('li[data-id]'); if(li) openClient(li.dataset.id);
+  };
+}
+
+/* ============ Cobranzas ============ */
+const MEDIOS=['Efectivo','Transferencia','Cheque'];
+const DIAS_AVISO=3, DIAS_COBRADA=10;
+function plata(n){ const v=Math.round(Number(n)||0); return (v<0?'-$ ':'$ ')+Math.abs(v).toLocaleString('es-AR'); }
+function plataCorta(n){ const v=Math.abs(Number(n)||0); const s=(n<0?'-':''); if(v>=1e6) return s+'$ '+(v/1e6).toLocaleString('es-AR',{maximumFractionDigits:1})+' M'; if(v>=1e4) return s+'$ '+Math.round(v/1e3).toLocaleString('es-AR')+' mil'; return plata(n); }
+function hoy0(){ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); }
+function plazoDe(c){ const p=parseInt(c.plazo,10); return p>0?p:30; }
+function claveCob(c,num){ return norm(String(c.codigo||'').trim())+'|'+num; }
+function fmtDM(ts){ const d=new Date(ts); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }
+function deudaDe(c){
+  const d=(S.deudas||{})[String(c.codigo||'').trim()];
+  if(!d || !d.items || !d.items.length) return null;
+  const h=hoy0(), plazo=plazoDe(c);
+  let vencido=0, porVencer=0, alDia=0, proximo=null, maxAtraso=0, alertas=0;
+  const items=d.items.map(x=>{
+    const f=fechaTs(x.fecha); const dias=f?Math.round((h-f)/864e5):null;
+    const v=new Date(f); v.setDate(v.getDate()+plazo); const vence=v.getTime();
+    const restan=Math.round((vence-h)/864e5);
+    const marcada=(S.cobradas||{})[claveCob(c,x.numero)];
+    const diasMarcada = marcada ? Math.round((h-fechaTs(marcada))/864e5) : null;
+    let estado;
+    if(x.importe<=0) estado='credito';
+    else if(marcada && diasMarcada<=DIAS_COBRADA) estado='cobrada';
+    else estado = restan<0 ? 'vencida' : restan<=DIAS_AVISO ? 'porvencer' : 'aldia';
+    const revisar = !!marcada && estado!=='cobrada' && estado!=='credito';
+    if(estado==='vencida'){ vencido+=x.importe; maxAtraso=Math.max(maxAtraso,-restan); alertas++; }
+    if(estado==='porvencer'){ porVencer+=x.importe; alertas++; }
+    if(estado==='aldia') alDia+=x.importe;
+    if(['vencida','porvencer','aldia'].includes(estado) && (proximo==null || restan<proximo)) proximo=restan;
+    return Object.assign({}, x, {dias, vence, restan, estado, marcada, revisar});
+  }).sort((a,b)=>(fechaTs(a.fecha)||0)-(fechaTs(b.fecha)||0));
+  return {saldo:d.saldo, items, vencido, porVencer, alDia, proximo, maxAtraso, alertas};
+}
+function textoVto(r){ return r<0 ? `vencida hace ${-r} ${-r===1?'día':'días'}` : r===0 ? 'vence hoy' : `vence en ${r} ${r===1?'día':'días'}`; }
+function textoEstadoCliente(dd){
+  if(!dd) return 'Sin deuda';
+  if(dd.vencido>0) return `Vencido hace ${dd.maxAtraso} ${dd.maxAtraso===1?'día':'días'}`;
+  if(dd.porVencer>0) return dd.proximo===0?'Vence hoy':`Vence en ${dd.proximo} ${dd.proximo===1?'día':'días'}`;
+  if(dd.proximo!=null) return `Próximo vencimiento en ${dd.proximo} días`;
+  return 'Sin facturas pendientes';
+}
+function actualizadoTexto(){
+  if(!S.deudasAct) return 'Todavía no se trajeron datos del sistema';
+  const d=new Date(S.deudasAct), h=new Date();
+  const hora=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  return 'Actualizado '+(d.toDateString()===h.toDateString()?'hoy':fmtDM(d.getTime()))+' a las '+hora;
+}
+function cobranzasHtml(c){
+  const dd=deudaDe(c), plazo=parseInt(c.plazo,10)||'';
+  let h='';
+  if(!S.deudasAct) h+=`<div class="cob-vacio"><p>Todavía no se trajeron las deudas del sistema.</p></div>`;
+  else if(!dd) h+=`<div class="cob-vacio ok"><b>Sin deuda</b><p>No figuran comprobantes pendientes.</p></div>`;
+  else {
+    h+=`<div class="cob-saldo"><small>Saldo en el sistema</small><b>${plata(dd.saldo)}</b></div>`;
+    h+=`<div class="cob-res">${dd.vencido>0?`<span class="t-venc">Vencido ${plata(dd.vencido)}</span>`:''}${dd.porVencer>0?`<span class="t-pv">Por vencer ${plata(dd.porVencer)}</span>`:''}${dd.vencido<=0&&dd.porVencer<=0?'<span class="t-ok">Nada vencido</span>':''}</div>`;
+  }
+  h+=`<div class="cob-conf"><label for="cobPlazo">Plazo de pago</label><div class="plazo"><input id="cobPlazo" type="number" min="0" max="365" inputmode="numeric" value="${plazo}" placeholder="30"><span>días</span></div>
+    <label>Medio de pago</label><div class="seg" role="group">${MEDIOS.map(m=>`<button type="button" data-act="medio" data-v="${m}" aria-pressed="${c.medio===m}">${m}</button>`).join('')}</div></div>`;
+  if(dd){
+    h+=`<h3>Comprobantes</h3><ul class="comp">`+dd.items.map(x=>{
+      const cls={vencida:'venc',porvencer:'pv',aldia:'ok',cobrada:'cob',credito:'cred'}[x.estado];
+      const est = x.estado==='credito' ? 'Crédito a favor del cliente'
+        : x.estado==='cobrada' ? `Marcada como cobrada el ${esc(x.marcada)}`
+        : `${x.dias} días · ${textoVto(x.restan)} (${fmtDM(x.vence)})`;
+      const extra = x.revisar ? `<small class="rev">La marcaste cobrada el ${esc(x.marcada)} y sigue pendiente en el sistema</small>` : '';
+      const btn = x.importe>0 ? (x.estado==='cobrada' ? `<button class="btn small" data-act="cobrada" data-n="${esc(x.numero)}" data-v="0">Deshacer</button>` : `<button class="btn small" data-act="cobrada" data-n="${esc(x.numero)}" data-v="1">Cobrada</button>`) : '';
+      return `<li class="${cls}"><div class="c1"><b>${esc(x.tipo)}</b><small>${esc(x.numero)} · ${esc(x.fecha)}</small><small class="est">${est}</small>${extra}</div><div class="c2"><b>${plata(x.importe)}</b>${btn}</div></li>`;
+    }).join('')+`</ul>`;
+  }
+  h+=`<p class="hint">${actualizadoTexto()}.</p>`;
+  return h;
+}
+let actualizandoDeudas=false;
+async function actualizarDeudasAhora(){
+  if(!S.scriptUrl){ toast('Conectá la planilla en Ajustes'); return false; }
+  if(actualizandoDeudas) return false;
+  actualizandoDeudas=true; renderCob(); toast('Trayendo deudas del sistema…');
+  let ok=false;
+  try{
+    const j = await (await fetch(S.scriptUrl+(S.scriptUrl.includes('?')?'&':'?')+'accion=actualizarDeudas',{cache:'no-store'})).json();
+    if(j.ok){ ok=true; await syncSheet(true); toast(`Deudas actualizadas: ${j.conDeuda} ${j.conDeuda===1?'cliente':'clientes'} con saldo`); }
+    else toast(j.error||'No se pudieron actualizar las deudas', 6000);
+  }catch(e){ toast('Sin conexión con la planilla'); }
+  actualizandoDeudas=false; renderCob();
+  if(UI.selected && UI.fichaTab===1) openClient(UI.selected, 1);
+  return ok;
+}
+function marcarCobrada(c, numero, valor){
+  S.cobradas = S.cobradas||{}; S.outbox = S.outbox||[];
+  const k=claveCob(c,numero), marcada=fechaDe(Date.now());
+  if(valor) S.cobradas[k]=marcada; else delete S.cobradas[k];
+  S.outbox = S.outbox.filter(o=>!(o.tipo==='cobrada' && o.clientId===c.id && o.numero===numero));
+  S.outbox.push({id:uid(), tipo:'cobrada', clientId:c.id, codigo:String(c.codigo||'').trim(), numero, valor:!!valor, marcada});
+  save(); scheduleFlush(); renderCob(); render();
+}
+
+/* ---- Vista de Cobranzas (scoring) ---- */
+function cambiarVista(v){
+  UI.vista=v;
+  document.body.classList.toggle('vista-cob', v==='cob');
+  document.querySelectorAll('#nav button').forEach(b=>b.setAttribute('aria-current', b.dataset.v===v ? 'page' : 'false'));
+  if(v==='cob'){ closeSheet(); renderCob(); }
+  else setTimeout(()=>map.invalidateSize(), 50);
+}
+function renderNavBadge(){
+  const n=S.clients.filter(c=>active(c)).map(deudaDe).filter(d=>d && d.alertas>0).length;
+  const b=document.getElementById('navBadge'); if(!b) return;
+  b.textContent=n; b.hidden=!n;
+}
+function renderCob(){
+  renderNavBadge();
+  if(UI.vista!=='cob') return;
+  const box=document.getElementById('cobView');
+  const orden=S.cobOrden||'vto', filtro=S.cobFiltro||'todos';
+  const filas=S.clients.filter(c=>active(c)).map(c=>({c, d:deudaDe(c)})).filter(x=>x.d && (x.d.saldo>0 || x.d.alertas>0));
+  const tot=filas.reduce((a,x)=>{ a.saldo+=Math.max(x.d.saldo,0); a.venc+=x.d.vencido; a.pv+=x.d.porVencer; return a; },{saldo:0,venc:0,pv:0});
+  const resto=Math.max(tot.saldo-tot.venc-tot.pv,0), base=Math.max(tot.saldo, tot.venc+tot.pv, 1);
+  let lista=filas.filter(x=> filtro==='venc' ? x.d.vencido>0 : filtro==='pv' ? x.d.porVencer>0 : true);
+  if(orden==='monto') lista.sort((a,b)=>b.d.saldo-a.d.saldo);
+  else lista.sort((a,b)=>(a.d.proximo==null?1e9:a.d.proximo)-(b.d.proximo==null?1e9:b.d.proximo) || b.d.vencido-a.d.vencido);
+  const max=Math.max(...lista.map(x=>Math.max(x.d.saldo, x.d.vencido+x.d.porVencer)),1);
+  const nV=filas.filter(x=>x.d.vencido>0).length, nP=filas.filter(x=>x.d.porVencer>0).length;
+  let h=`<div class="cob-head"><div><h2>Cobranzas</h2><small>${actualizadoTexto()}</small></div>
+    <button class="ibtn dark" id="cobAct" aria-label="Actualizar deudas" ${actualizandoDeudas?'disabled':''}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="${actualizandoDeudas?'gira':''}"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><polyline points="20 4 20 9 15 9"/></svg></button></div>`;
+  if(!S.deudasAct){
+    h+=`<div class="cob-vacio"><p>Todavía no se trajeron las deudas del sistema.</p><p class="hint">Tocá el botón de actualizar. Si es la primera vez, primero hay que cargar tu usuario y clave del sistema en el script de la planilla.</p></div>`;
+  } else {
+    h+=`<div class="cob-total"><small>Deuda total de tus clientes</small><b>${plata(tot.saldo)}</b>
+      <div class="stack" aria-hidden="true"><i class="s-venc" style="width:${tot.venc/base*100}%"></i><i class="s-pv" style="width:${tot.pv/base*100}%"></i><i class="s-ok" style="width:${resto/base*100}%"></i></div>
+      <div class="leyenda"><span><i class="s-venc"></i>Vencido <b>${plataCorta(tot.venc)}</b></span><span><i class="s-pv"></i>Por vencer <b>${plataCorta(tot.pv)}</b></span><span><i class="s-ok"></i>Al día <b>${plataCorta(resto)}</b></span></div></div>
+    <div class="cob-ctrl">
+      <div class="seg" role="group" aria-label="Ordenar"><button data-o="vto" aria-pressed="${orden==='vto'}">Por vencimiento</button><button data-o="monto" aria-pressed="${orden==='monto'}">Por monto</button></div>
+      <div class="filtros"><button data-f="todos" aria-pressed="${filtro==='todos'}">Todos <span>${filas.length}</span></button><button data-f="venc" aria-pressed="${filtro==='venc'}">Vencidos <span>${nV}</span></button><button data-f="pv" aria-pressed="${filtro==='pv'}">Por vencer <span>${nP}</span></button></div>
+    </div>`;
+    if(!lista.length) h+=`<div class="cob-vacio ok"><b>${filas.length?'No hay clientes en este filtro':'Ningún cliente con deuda'}</b></div>`;
+    else h+=`<ul class="score">`+lista.map(({c,d})=>{
+      const okD=Math.max(d.saldo-d.vencido-d.porVencer,0);
+      const est=d.vencido>0?'venc':d.porVencer>0?'pv':'ok';
+      return `<li data-id="${c.id}" class="${est}"><div class="sc-top"><span class="sc-nom"><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre)}</span><b>${plata(d.saldo)}</b></div>
+        <div class="bar" aria-hidden="true"><i class="s-venc" style="width:${d.vencido/max*100}%"></i><i class="s-pv" style="width:${d.porVencer/max*100}%"></i><i class="s-ok" style="width:${okD/max*100}%"></i></div>
+        <div class="sc-sub"><span class="sc-est">${textoEstadoCliente(d)}</span>${d.vencido>0?`<span>Vencido ${plataCorta(d.vencido)}</span>`:''}${c.medio?`<span>${esc(c.medio)}</span>`:''}${c.zona!=null?`<span class="sc-z" style="--c:${zoneColor(c.zona)}">Zona ${c.zona+1}</span>`:''}</div></li>`;
+    }).join('')+`</ul>`;
+  }
+  box.innerHTML=h;
+  const act=document.getElementById('cobAct'); if(act) act.onclick=actualizarDeudasAhora;
+  box.onclick=e=>{
+    const o=e.target.closest('[data-o]'); if(o){ S.cobOrden=o.dataset.o; save(); renderCob(); return; }
+    const f=e.target.closest('[data-f]'); if(f){ S.cobFiltro=f.dataset.f; save(); renderCob(); return; }
+    const li=e.target.closest('li[data-id]'); if(li) openClient(li.dataset.id, 1);
   };
 }
 
@@ -2356,7 +2634,7 @@ map.on('dragstart', ()=>{ if(follow){ follow=false; updateMeBtn(); } });
 
 /* ============ Avisos ============ */
 let toastT;
-function toast(t){ const el=document.getElementById('toast'); el.textContent=t; el.style.display='block'; clearTimeout(toastT); toastT=setTimeout(()=>el.style.display='none',2400); }
+function toast(t, ms){ const el=document.getElementById('toast'); el.textContent=t; el.style.display='block'; clearTimeout(toastT); toastT=setTimeout(()=>el.style.display='none',ms||2400); }
 function showBanner(text,btn,fn){ const b=document.getElementById('banner'); document.getElementById('bannerTxt').textContent=text; const bb=document.getElementById('bannerBtn'); bb.textContent=btn; bb.onclick=fn; b.style.display='flex'; document.getElementById('fabs').style.display='none'; }
 function hideBanner(){ document.getElementById('banner').style.display='none'; document.getElementById('fabs').style.display='flex'; }
 
@@ -2365,6 +2643,8 @@ load();
 render();
 if(S.track) startTracking(false);
 setTimeout(()=>autoSync(true), 400);
+document.getElementById('nav').onclick=e=>{ const b=e.target.closest('[data-v]'); if(b) cambiarVista(b.dataset.v); };
+renderNavBadge();
 if(S.clients.some(located)) fitZone();
 if(!S.clients.length) openEmpty();
 else checkPending();
