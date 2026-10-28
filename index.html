@@ -896,6 +896,13 @@ li.pv .sc-est{color:#b86f00;font-weight:700}
 .list.revisar li{flex-wrap:wrap}
 .list.revisar .txt b,.list.revisar .txt small{white-space:normal}
 .list.revisar .acc{flex-basis:100%;display:flex;gap:8px;padding-left:42px}
+#revBar{position:fixed;left:10px;right:10px;bottom:calc(var(--safe-b) + 68px);z-index:640;background:var(--card);border-radius:16px;box-shadow:0 8px 24px rgba(10,30,36,.3);padding:12px 14px}
+#revBar[hidden]{display:none}
+#revBar .rv-txt{display:flex;flex-direction:column;gap:2px;margin-bottom:10px}
+#revBar .rv-txt small{color:var(--ink-2);font-size:13px}
+#revBar .rv-acc{display:flex;gap:8px;flex-wrap:wrap}
+#revBar .rv-acc .btn{flex:1 1 auto;min-height:44px}
+body.revisando #fabs, body.revisando #chips{display:none}
 .razon{margin:-2px 0 6px;color:var(--ink-2);font-size:15px;font-weight:500}
 .dud{position:absolute;left:-6px;top:-6px;width:16px;height:16px;border-radius:50%;background:#e79a12;color:#fff;font:700 11px/16px var(--font);text-align:center;border:2px solid #fff;z-index:2;font-style:normal}
 .medios{display:flex;flex-wrap:wrap;gap:8px}
@@ -927,6 +934,7 @@ li.pv .sc-est{color:#b86f00;font-weight:700}
 </div>
 
 <div id="cobView" aria-label="Cobranzas"></div>
+<div id="revBar" hidden></div>
 <nav id="nav"><button data-v="mapa" aria-current="page"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><line x1="9" y1="4" x2="9" y2="17.5"/><line x1="15" y1="6.5" x2="15" y2="20"/></svg><span>Mapa</span></button><button data-v="cob" aria-current="false"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><line x1="6" y1="9.5" x2="6" y2="14.5"/><line x1="18" y1="9.5" x2="18" y2="14.5"/></svg><span>Cobranzas</span><b id="navBadge" hidden>0</b></button></nav>
 <div id="fabs">
   <button class="fab" id="btnNorth" aria-label="Volver a orientar al norte"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2 L18 13 L13 11 L8 13 Z" fill="#e23d4f"/><path d="M13 24 L8 13 L13 15 L18 13 Z" fill="#9aa7ab"/></svg></button>
@@ -1005,7 +1013,9 @@ map.on('click', e => {
   if(UI.placing){
     const c = S.clients.find(x=>x.id===UI.placing);
     if(c){ c.lat=e.latlng.lat; c.lng=e.latlng.lng; c.geo='ok'; delete c.geoDudosa; delete c.geoNota; queueCampos(c, geoCampos(c)); assignNearestZone(c); save(); }
-    UI.placing=null; hideBanner(); render(); if(c) openClient(c.id); toast('Ubicación guardada');
+    UI.placing=null; hideBanner(); render(); toast('Ubicación guardada');
+    if(UI.revisando){ UI.revisando=UI.revisando.filter(id=>id!==(c&&c.id)); mostrarRevision(); return; }
+    if(c) openClient(c.id);
     return;
   }
   if(!UI.moving) closeSheet();
@@ -1496,12 +1506,26 @@ function openFailed(){
   const dud = S.clients.filter(c=>located(c)&&active(c)&&c.geoDudosa);
   const item = (c, dudosa) => `<li style="--c:${dudosa?'#e79a12':'#c2410c'}"><span class="num">${dudosa?'?':'!'}</span><span class="txt"><b><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre)}</b><small>${esc(c.direccion)}${c.localidad?', '+esc(c.localidad):''}${c.partido?' ('+esc(c.partido)+')':''}</small>${c.geoNota?`<small>${esc(c.geoNota)}</small>`:''}</span>
     <span class="acc">${dudosa?`<button class="btn small" data-v="${c.id}">Ver</button><button class="btn small" data-ok="${c.id}">Está bien</button>`:`<button class="btn small" data-e="${c.id}">Editar</button>`}<button class="btn small" data-p="${c.id}">${dudosa?'Mover':'Ubicar'}</button></span></li>`;
+  const pendientesRev = dud.length+sin.length;
   openSheet(`<h2>Ubicaciones a revisar</h2>
+  ${pendientesRev?`<div class="row" style="margin-top:4px"><button class="btn go" id="revBuscar">Volver a buscar con el buscador oficial (${pendientesRev})</button></div>`:''}
+  ${dud.length?`<div class="row"><button class="btn dark" id="revUno">Revisar uno por uno en el mapa (${dud.length})</button></div>`:''}
   ${dud.length?`<h3>Revisar en el mapa (${dud.length})</h3><p class="sub">Se encontró la calle pero no la altura exacta. Tocá "Ver" para revisar el punto; si está bien, confirmalo, y si no, movelo.</p><ul class="list revisar">${dud.map(c=>item(c,true)).join('')}</ul>`:''}
   ${sin.length?`<h3>Sin ubicar (${sin.length})</h3><p class="sub">No se encontraron, o lo que se encontró estaba en otro partido. Ubicalos tocando el mapa o corregí la dirección.</p>
   <div class="row"><button class="btn dark" id="retryGeo">Reintentar búsqueda</button></div><ul class="list revisar">${sin.map(c=>item(c,false)).join('')}</ul>`:''}
   ${!dud.length&&!sin.length?'<div class="empty"><p>No hay ubicaciones pendientes de revisión.</p></div>':''}`);
   const rg=document.getElementById('retryGeo'); if(rg) rg.onclick = ()=>{ sin.forEach(c=>c.geo='pending'); save(); geocodeAll(); };
+  const rb=document.getElementById('revBuscar'); if(rb) rb.onclick = async ()=>{
+    const lista = dud.concat(sin);
+    rb.disabled=true; rb.textContent='Buscando…';
+    let n=0; try{ n = await georefLote(lista); }catch(e){ toast('No se pudo consultar el buscador oficial'); }
+    lista.filter(c=>c.geo==='ok' && !c.geoDudosa).forEach(c=>{ queueCampos(c, geoCampos(c), true); if(c.zona==null) assignNearestZone(c); });
+    save(); scheduleFlush(); render();
+    const quedan = S.clients.filter(c=>active(c) && (c.geoDudosa || !located(c))).length;
+    toast(`Se ubicaron ${n} de ${lista.length}. Quedan ${quedan} para revisar.`, 5000);
+    openFailed();
+  };
+  const ru=document.getElementById('revUno'); if(ru) ru.onclick = ()=>revisarUnoPorUno();
   sheetBody.onclick = e=>{
     const ed = e.target.closest('[data-e]'), pl = e.target.closest('[data-p]'), ve = e.target.closest('[data-v]'), ok = e.target.closest('[data-ok]');
     const cli = el => S.clients.find(c=>c.id===el.dataset[Object.keys(el.dataset)[0]]);
@@ -1510,6 +1534,37 @@ function openFailed(){
     if(ok){ const c=cli(ok); delete c.geoDudosa; delete c.geoNota; queueCampos(c, geoCampos(c)); save(); render(); toast('Ubicación confirmada'); openFailed(); }
     if(pl){ const c=cli(pl); UI.placing=c.id; closeSheet(); if(located(c)) map.setView([c.lat,c.lng],17); showBanner(`Tocá el mapa donde está ${c.nombre||'el cliente'}`,'Cancelar',()=>{UI.placing=null;hideBanner();}); }
   };
+}
+
+/* ---- Revisión de ubicaciones de a una ---- */
+function revisarUnoPorUno(){
+  UI.revisando = S.clients.filter(c=>located(c)&&active(c)&&c.geoDudosa).map(c=>c.id);
+  UI.revIdx = 0; closeSheet(); mostrarRevision();
+}
+function mostrarRevision(){
+  const bar=document.getElementById('revBar');
+  const ids=(UI.revisando||[]).filter(id=>{ const c=S.clients.find(x=>x.id===id); return c && c.geoDudosa; });
+  UI.revisando=ids;
+  if(!ids.length || UI.revIdx>=ids.length){ terminarRevision(ids.length?'Revisión terminada':'No quedan ubicaciones para revisar'); return; }
+  const c=S.clients.find(x=>x.id===ids[UI.revIdx]);
+  UI.selected=c.id; render(); map.setView([c.lat,c.lng],17);
+  bar.innerHTML=`<div class="rv-txt"><small>${UI.revIdx+1} de ${ids.length}</small><b><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre)}</b><small>${esc(c.direccion)}${c.localidad?', '+esc(c.localidad):''}</small></div>
+    <div class="rv-acc"><button class="btn go" data-r="ok">Está bien</button><button class="btn" data-r="mover">Mover</button><button class="btn" data-r="saltar">Saltar</button><button class="btn small" data-r="salir">Salir</button></div>`;
+  bar.hidden=false; document.body.classList.add('revisando');
+  bar.onclick=e=>{
+    const b=e.target.closest('[data-r]'); if(!b) return;
+    const r=b.dataset.r;
+    if(r==='ok'){ delete c.geoDudosa; delete c.geoNota; queueCampos(c, geoCampos(c)); save(); UI.revisando.splice(UI.revIdx,1); mostrarRevision(); }
+    if(r==='saltar'){ UI.revIdx++; mostrarRevision(); }
+    if(r==='salir') terminarRevision();
+    if(r==='mover'){ UI.placing=c.id; bar.innerHTML=`<div class="rv-txt"><b>Tocá el mapa donde está ${esc(c.nombre)}</b></div><div class="rv-acc"><button class="btn" data-r="cancelar">Cancelar</button></div>`;
+      bar.onclick=e2=>{ if(e2.target.closest('[data-r="cancelar"]')){ UI.placing=null; mostrarRevision(); } }; }
+  };
+}
+function terminarRevision(msg){
+  const bar=document.getElementById('revBar'); bar.hidden=true; bar.innerHTML='';
+  document.body.classList.remove('revisando'); UI.revisando=null; UI.selected=null; render();
+  if(msg) toast(msg);
 }
 
 /* ============ Formulario cliente ============ */
@@ -1909,6 +1964,54 @@ function cleanAddr(t){
     .replace(/\bSto\.\s*/gi,'Santo ').replace(/\bSta\.\s*/gi,'Santa ').replace(/\bIng\.\s*/gi,'Ingeniero ')
     .replace(/\s+,/g,',').replace(/,\s*,/g,',').replace(/\s{2,}/g,' ').trim().replace(/,$/,'');
 }
+/* Buscador oficial de direcciones (API Georef, datos.gob.ar): ubica por cuadra según la altura */
+const GEOREF='https://apis.datos.gob.ar/georef/api/direcciones';
+function esCABA(c){ return /ciudad autonoma|capital federal/.test(norm((c.partido||'')+' '+(c.localidad||''))); }
+function georefVariantes(c){
+  const dir=String(c.direccion||'').replace(/\s+/g,' ').trim();
+  const m=dir.match(/^(.*?)\s*(\d+)\s*$/); if(!m) return [];
+  const calle=m[1].trim().replace(/,$/,''), alt=m[2], v=[];
+  const add=x=>{ x=String(x).replace(/\s+/g,' ').trim(); if(x && v.indexOf(x)<0) v.push(x); };
+  add(calle+' '+alt);
+  const sinAv=calle.replace(/^(av\.?|avenida)\s+/i,'').replace(/^(dr\.?|doctor|gral\.?|general|presidente|pte\.?|capit[aá]n|cap\.?|ing\.?|padre|soldado)\s+/i,'');
+  add(sinAv+' '+alt);
+  const pal=sinAv.split(' ').filter(w=>w.length>2 && !/^(de|del|la|las|los)$/i.test(w));
+  if(pal.length) add(pal[pal.length-1]+' '+alt);
+  const num=calle.match(/^(calle|diagonal|diag\.?|ruta)\s+(\d+)/i); if(num) add(num[2]+' '+alt);
+  return v;
+}
+function georefPedido(c, dir){
+  if(esCABA(c)) return {direccion:dir, provincia:'Ciudad Autónoma de Buenos Aires', max:3};
+  return c.partido ? {direccion:dir, departamento:c.partido, provincia:'Buenos Aires', max:3} : {direccion:dir, provincia:'Buenos Aires', max:5};
+}
+function georefValida(d, c){
+  if(!d || !d.ubicacion || d.ubicacion.lat==null) return false;
+  if(c.partido && !esCABA(c)) return norm(d.departamento && d.departamento.nombre)===norm(c.partido);
+  if(!c.partido && c.localidad) return norm((d.localidad_censal&&d.localidad_censal.nombre)||'').includes(norm(c.localidad)) || true;
+  return true;
+}
+// Ubica varios clientes de una vez; devuelve cuántos encontró
+async function georefLote(clis){
+  let pend=clis.filter(c=>georefVariantes(c).length), ok=0;
+  for(let ronda=0; ronda<4 && pend.length; ronda++){
+    const pedidos=[]; pend.forEach(c=>{ const v=georefVariantes(c)[ronda]; if(v) pedidos.push({c, q:georefPedido(c, v)}); });
+    if(!pedidos.length) break;
+    for(let i=0;i<pedidos.length;i+=500){
+      const parte=pedidos.slice(i,i+500);
+      const r=await fetch(GEOREF,{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({direcciones:parte.map(p=>p.q)})});
+      if(!r.ok) throw new Error('georef '+r.status);
+      const j=await r.json();
+      (j.resultados||[]).forEach((x,k)=>{
+        const c=parte[k].c, d=(x.direcciones||[]).find(d=>georefValida(d,c)); if(!d) return;
+        c.lat=+d.ubicacion.lat; c.lng=+d.ubicacion.lon; c.geo='ok'; c._found=d.nomenclatura||''; ok++;
+        delete c.geoDudosa; delete c.geoNota;
+        if(/ubicar a mano/i.test(c.notas||'') || !c.partido){ c.geoDudosa=true; c.geoNota='Ubicada automáticamente: confirmá que el punto esté bien'; }
+      });
+    }
+    pend=pend.filter(c=>c.geo!=='ok');
+  }
+  return ok;
+}
 async function nominatim(q){
   const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=ar&accept-language=es&viewbox=-59.4,-34.1,-57.7,-35.2&q='+encodeURIComponent(q);
   const r = await fetch(url,{headers:{'Accept':'application/json'}});
@@ -1924,8 +2027,9 @@ function geoValida(hit, c){
 }
 // Encontró el número exacto o solo la calle
 function geoExacta(hit){ return /^\d/.test(String(hit.display_name||'').trim()); }
-async function geocodeOne(c){
+async function geocodeOne(c, sinGeoref){
   delete c.geoDudosa; delete c.geoNota;
+  if(!sinGeoref){ try{ c.geo='pending'; if(await georefLote([c])) return true; }catch(e){} }
   if(/ubicar a mano/i.test(c.notas||'')){ c.geo='fail'; c.geoNota='Marcado para ubicar a mano'; return false; }
   const dir = cleanAddr(c.direccion);
   const calle = dir.split(',')[0].trim();
@@ -1971,10 +2075,17 @@ async function geocodeAll(primeraCarga){
   UI.geocoding = true; closeSheet();
   let i=0, stop=false;
   showBanner('', 'Pausar', ()=>{ stop=true; });
-  for(const c of todo){
+  document.getElementById('bannerTxt').textContent = `Buscando ${todo.length} direcciones…`;
+  try{
+    await georefLote(todo);
+    todo.filter(c=>c.geo==='ok').forEach(c=>{ if(!c.geoDudosa) queueCampos(c, geoCampos(c), true); });
+    save(); render();
+  }catch(e){}
+  const resto = todo.filter(c=>c.geo!=='ok');
+  for(const c of resto){
     if(stop) break;
-    i++; document.getElementById('bannerTxt').textContent = `Ubicando clientes: ${i} de ${todo.length}`;
-    const okG = await geocodeOne(c);
+    i++; document.getElementById('bannerTxt').textContent = `Buscando en el mapa: ${i} de ${resto.length}`;
+    const okG = await geocodeOne(c, true);
     if(okG && !c.geoDudosa) queueCampos(c, geoCampos(c), true);
     save();
     if(c._err){ stop=true; break; } // este dispositivo no puede usar el buscador
