@@ -262,7 +262,21 @@ function actualizarResumenes(ss) {
 
 /* ================= Estructura y migración ================= */
 function estructura(ss) {
-  if (!(ss.getSheetByName(H_CLIENTES) && ss.getSheetByName(H_MAPA) && ss.getSheetByName(H_VISITAS))) migrar(ss);
+  if (!ss.getSheetByName(H_CLIENTES)) migrar(ss);
+  // Si ya existe Clientes pero faltan otras hojas (por ejemplo, después de importar un archivo), se crean vacías
+  if (!ss.getSheetByName(H_VISITAS)) {
+    const v = ss.insertSheet(H_VISITAS, Math.min(1, ss.getSheets().length));
+    v.getRange('A:G').setNumberFormat('@');
+    v.getRange(1, 1, 1, COLS_VISITAS.length).setValues([COLS_VISITAS]);
+    formatearEncabezado(v, COLS_VISITAS.length);
+  }
+  if (!ss.getSheetByName(H_MAPA)) {
+    const m = ss.insertSheet(H_MAPA, ss.getSheets().length);
+    m.getRange('A:C').setNumberFormat('@');
+    m.getRange(1, 1, 1, 3).setValues([['Código', 'Lat', 'Lng']]);
+    formatearEncabezado(m, 3);
+    m.hideSheet();
+  }
   asegurarHorario(ss);
   const cl = ss.getSheetByName(H_CLIENTES);
   asegurarColumna(cl, 'Razón social', 'nombre', '@');
