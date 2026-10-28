@@ -898,6 +898,12 @@ li.pv .sc-est{color:#b86f00;font-weight:700}
 .list.revisar .acc{flex-basis:100%;display:flex;gap:8px;padding-left:42px}
 #revBar{position:fixed;left:10px;right:10px;bottom:calc(var(--safe-b) + 68px);z-index:640;background:var(--card);border-radius:16px;box-shadow:0 8px 24px rgba(10,30,36,.3);padding:12px 14px}
 #revBar[hidden]{display:none}
+#avisoZona{position:fixed;left:10px;right:10px;top:calc(var(--safe-t) + 150px);z-index:650;background:var(--card);border-radius:16px;box-shadow:0 8px 24px rgba(10,30,36,.3);padding:12px 14px;border-left:5px solid var(--sel)}
+#avisoZona[hidden]{display:none}
+#avisoZona p{margin:0 0 10px;font-size:15px;line-height:1.35}
+#avisoZona .az-acc{display:flex;flex-wrap:wrap;margin:-4px}
+#avisoZona .az-acc .btn{flex:1 1 auto;margin:4px;min-height:44px}
+.btn.linkish{background:none;border:0;box-shadow:none;text-decoration:underline;color:var(--ink-2);font-weight:600}
 #revBar .rv-txt{display:flex;flex-direction:column;gap:2px;margin-bottom:10px}
 #revBar .rv-txt small{color:var(--ink-2);font-size:13px}
 #revBar .rv-acc{display:flex;gap:8px;flex-wrap:wrap}
@@ -935,6 +941,7 @@ body.revisando #fabs, body.revisando #chips{display:none}
 
 <div id="cobView" aria-label="Cobranzas"></div>
 <div id="revBar" hidden></div>
+<div id="avisoZona" hidden></div>
 <nav id="nav"><button data-v="mapa" aria-current="page"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><line x1="9" y1="4" x2="9" y2="17.5"/><line x1="15" y1="6.5" x2="15" y2="20"/></svg><span>Mapa</span></button><button data-v="cob" aria-current="false"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><line x1="6" y1="9.5" x2="6" y2="14.5"/><line x1="18" y1="9.5" x2="18" y2="14.5"/></svg><span>Cobranzas</span><b id="navBadge" hidden>0</b></button></nav>
 <div id="fabs">
   <button class="fab" id="btnNorth" aria-label="Volver a orientar al norte"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2 L18 13 L13 11 L8 13 Z" fill="#e23d4f"/><path d="M13 24 L8 13 L13 15 L18 13 Z" fill="#9aa7ab"/></svg></button>
@@ -1111,11 +1118,128 @@ function recenter(P,A,C,k){
 function assignNearestZone(c){
   const others = S.clients.filter(o=>o!==c && located(o) && active(o) && o.zona!=null);
   if(!others.length){ c.zona = 0; queueCampos(c, zonaCampo(c)); return; }
-  const p = xy(c); let best=others[0], bd=Infinity;
-  others.forEach(o=>{ const dd=d2(p,xy(o)); if(dd<bd){bd=dd;best=o;} });
-  c.zona = best.zona;
+  const z = zonasCercanas(c, null, S.maxZona||12)[0];
+  c.zona = z!=null ? z : zonasCercanas(c, null, Infinity)[0];
   queueCampos(c, zonaCampo(c));
 }
+/* ---- Tamaños y cercanía de zonas ---- */
+function miembrosZona(z){ return S.clients.filter(c=>located(c) && active(c) && c.zona===z); }
+function tamZonas(){ const t={}; S.clients.forEach(c=>{ if(located(c)&&active(c)&&c.zona!=null) t[c.zona]=(t[c.zona]||0)+1; }); return t; }
+// Zonas ordenadas por cercanía al cliente (distancia al cliente más próximo de cada zona), con lugar libre
+function zonasCercanas(c, excluir, tope, extra){
+  const p=xy(c), best={}, t=tamZonas();
+  S.clients.forEach(o=>{ if(o===c || !located(o) || !active(o) || o.zona==null || o.zona===excluir) return;
+    const d=d2(p,xy(o)); if(best[o.zona]==null || d<best[o.zona]) best[o.zona]=d; });
+  return Object.keys(best).map(Number).filter(z=>(t[z]||0)+((extra&&extra[z])||0) < tope).sort((a,b)=>best[a]-best[b]);
+}
+function moverDeZona(c, z){ c.zona=z; c.zonaManual=true; queueCampos(c, zonaCampo(c), true); }
+// Arregla zonas que superan el máximo: saca los clientes más alejados del centro hacia la zona vecina con lugar
+function rebalancearZonas(){
+  const MAX=S.maxZona||12; let movidos=0;
+  for(let g=0; g<500; g++){
+    const t=tamZonas(), z=Object.keys(t).map(Number).find(k=>t[k]>MAX); if(z==null) break;
+    const m=miembrosZona(z), P=m.map(xy), cx=P.reduce((a,p)=>a+p[0],0)/P.length, cy=P.reduce((a,p)=>a+p[1],0)/P.length;
+    // elegir el cliente que menos se aleja al pasarlo a una zona vecina con lugar
+    let mejor=null, costo=Infinity;
+    m.forEach((c,i)=>{ const dest=zonasCercanas(c, z, MAX)[0]; if(dest==null) return;
+      const dd=Math.sqrt(d2(xy(c), xy(miembrosZona(dest).reduce((b,o)=>d2(xy(c),xy(o))<d2(xy(c),xy(b))?o:b)))) - Math.sqrt(d2(P[i],[cx,cy]));
+      if(dd<costo){ costo=dd; mejor={c,dest}; } });
+    if(!mejor) break;
+    moverDeZona(mejor.c, mejor.dest); movidos++;
+  }
+  if(movidos){ scheduleFlush(); save(); }
+  return movidos;
+}
+
+/* ---- Zona del día: se aprende de los recorridos reales ---- */
+function inicioDia(d){ d=d||new Date(); return new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime(); }
+function visitadosDia(ini){ return S.clients.filter(c=>active(c) && isVisited(c) && c.visitFecha>=ini && c.visitFecha<ini+86400000); }
+function zonaMayoria(lista){
+  const n={}; lista.forEach(c=>{ if(c.zona!=null) n[c.zona]=(n[c.zona]||0)+1; });
+  const zs=Object.keys(n).map(Number); if(!zs.length) return null;
+  return zs.sort((a,b)=>n[b]-n[a] || a-b)[0];
+}
+function zonaDelDia(excluir){
+  if(S.hoyZona && S.hoyZona.dia===diaKey()) return S.hoyZona.z;
+  return zonaMayoria(visitadosDia(inicioDia()).filter(c=>c!==excluir));
+}
+// Antes de marcar una visita: si el cliente es de otra zona, pregunta si se suma a la zona del día
+function conZonaDelDia(c, seguir){
+  if(UI.avisoZona) mudarSobrantes(true);
+  if(isVisited(c) || c.zona==null){ seguir(); return; }
+  const zd=zonaDelDia(c);
+  if(zd==null || zd===c.zona){ seguir(); return; }
+  const zc=c.zona;
+  openSheet(`<h2>¿Agregar a la Zona ${zd+1}?</h2>
+    <p class="sub"><b>${esc(codeOf(c))} ${esc(c.nombre||'')}</b> es de la Zona ${zc+1}, y hoy venís haciendo la Zona ${zd+1}. Si lo agregás, queda en la Zona ${zd+1} para los próximos meses.</p>
+    <div class="row"><button class="btn go" id="zdSi">Sí, pasarlo a la Zona ${zd+1}</button><button class="btn" id="zdNo">No, dejarlo en la Zona ${zc+1}</button></div>
+    <div class="row" style="justify-content:center"><button class="btn small linkish" id="zdCambio">Hoy hago la Zona ${zc+1}</button></div>`);
+  sheetBody.onclick=null;
+  document.getElementById('zdSi').onclick=()=>{ moverDeZona(c, zd); save(); scheduleFlush(); toast(`Agregado a la Zona ${zd+1}`); seguir(); };
+  document.getElementById('zdNo').onclick=()=>seguir();
+  document.getElementById('zdCambio').onclick=()=>{
+    S.hoyZona={dia:diaKey(), z:zc}; save();
+    const otros=visitadosDia(inicioDia()).filter(o=>o!==c && o.zona!==zc);
+    if(!otros.length){ seguir(); return; }
+    openSheet(`<h2>Hoy hacés la Zona ${zc+1}</h2>
+      <p class="sub">Hoy ya visitaste ${otros.length===1?'un cliente':otros.length+' clientes'} de otra zona: ${otros.map(o=>'<b>'+esc(codeOf(o)+' '+(o.nombre||''))+'</b> (Zona '+(o.zona+1)+')').join(', ')}. ¿${otros.length===1?'Lo':'Los'} pasamos a la Zona ${zc+1}?</p>
+      <div class="row"><button class="btn go" id="zdSi2">Sí, pasar${otros.length===1?'lo':'los'}</button><button class="btn" id="zdNo2">No</button></div>`);
+    sheetBody.onclick=null;
+    document.getElementById('zdSi2').onclick=()=>{ otros.forEach(o=>moverDeZona(o, zc)); save(); scheduleFlush(); seguir(); };
+    document.getElementById('zdNo2').onclick=()=>seguir();
+  };
+}
+// Al día siguiente: los que quedaron sin visitar de la zona del día pasan a la zona vecina
+function revisarDiaAnterior(){
+  if(!S.clients.length || UI.avisoZona) return;
+  const hoyIni=inicioDia();
+  let ult=0; S.clients.forEach(c=>{ if(active(c) && isVisited(c) && c.visitFecha<hoyIni && c.visitFecha>ult) ult=c.visitFecha; });
+  if(!ult) return;
+  const dia=diaKey(new Date(ult)); if(S.zonaRevisada===dia) return;
+  const vis=visitadosDia(inicioDia(new Date(ult))), zd=zonaMayoria(vis);
+  const deZona=vis.filter(c=>c.zona===zd);
+  if(zd==null || deZona.length<4){ S.zonaRevisada=dia; save(); return; } // no fue un día de zona
+  const sob=miembrosZona(zd).filter(c=>!isVisited(c));
+  if(!sob.length){ S.zonaRevisada=dia; save(); compactarZonasChicas(true); return; }
+  UI.avisoZona={dia, z:zd, ids:sob.map(c=>c.id)};
+  const el=document.getElementById('avisoZona');
+  const cuando = (hoyIni-inicioDia(new Date(ult)))===86400000 ? 'Ayer' : 'El '+new Date(ult).toLocaleDateString('es-AR',{weekday:'long'});
+  el.innerHTML=`<p>${cuando} te ${sob.length===1?'quedó 1 cliente':'quedaron '+sob.length+' clientes'} sin visitar de la Zona ${zd+1}: ${sob.slice(0,4).map(c=>esc(c.nombre||codeOf(c))).join(', ')}${sob.length>4?' y '+(sob.length-4)+' más':''}.</p>
+    <div class="az-acc"><button class="btn go" id="azMudar">Mudarlos a la zona más cercana</button><button class="btn" id="azDejar">Dejarlos en la Zona ${zd+1}</button></div>`;
+  el.hidden=false;
+  document.getElementById('azMudar').onclick=()=>mudarSobrantes(false);
+  document.getElementById('azDejar').onclick=()=>{ S.zonaRevisada=dia; save(); UI.avisoZona=null; el.hidden=true; toast(`Quedan en la Zona ${zd+1}`); };
+}
+function mudarSobrantes(auto){
+  const a=UI.avisoZona; if(!a) return;
+  UI.avisoZona=null; document.getElementById('avisoZona').hidden=true;
+  S.zonaRevisada=a.dia;
+  const MAX=S.maxZona||12, msg=[], avisos=[];
+  a.ids.forEach(id=>{ const c=S.clients.find(x=>x.id===id); if(!c || c.zona!==a.z || isVisited(c)) return;
+    const z=zonasCercanas(c, a.z, MAX)[0]; if(z==null) return;
+    moverDeZona(c, z); msg.push(`${c.nombre||codeOf(c)} → Zona ${z+1}`);
+    if(miembrosZona(z).filter(o=>o!==c).every(isVisited)) avisos.push(`${c.nombre||codeOf(c)} quedó pendiente este mes en la Zona ${z+1}, que ya hiciste`);
+  });
+  compactarZonasChicas(true);
+  save(); scheduleFlush(); render();
+  if(msg.length) toast((auto?'Se reacomodaron las zonas: ':'')+msg.join(' · ')+(avisos.length?'. '+avisos.join('. '):''), 6000+avisos.length*2000);
+}
+// Zonas que quedaron con menos de 5: sus clientes pasan a las zonas vecinas, si ninguna queda con más de 9
+function compactarZonasChicas(silencio){
+  const t=tamZonas(); let total=0;
+  Object.keys(t).map(Number).filter(z=>t[z]>0 && t[z]<5).forEach(z=>{
+    const m=miembrosZona(z), plan=[], extra={};
+    for(const c of m){ const dest=zonasCercanas(c, z, 9, extra)[0];
+      const cerca=zonasCercanas(c, z, Infinity)[0];
+      if(dest==null || dest!==cerca) return; // la vecina más cercana ya está llena: se deja el grupo
+      plan.push([c,dest]); extra[dest]=(extra[dest]||0)+1; }
+    plan.forEach(([c,dest])=>moverDeZona(c,dest)); total+=plan.length;
+    if(plan.length && !silencio) toast(`La Zona ${z+1} se repartió entre sus vecinas`);
+  });
+  return total;
+}
+
+
 /* ---- Cola de cambios de estado hacia la planilla ---- */
 function origOf(c){ return {codigo:c.codigo||'', nombre:c.nombre||'', direccion:c.direccion||'', localidad:c.localidad||''}; }
 function geoCampos(c){ return located(c) ? {lat:c.lat.toFixed(6), lng:c.lng.toFixed(6)} : {lat:'', lng:''}; }
@@ -1312,7 +1436,7 @@ function openClient(id, tab){
     const act = a.dataset.act;
     if(act==='medio'){ const l=mediosDe(c), v=a.dataset.v; const n=l.indexOf(v)>=0 ? l.filter(x=>x!==v) : l.concat(v); c.medio=MEDIOS.filter(m=>n.indexOf(m)>=0).join(', '); queueCampos(c,{medio:c.medio}); save(); refrescarCob(); return; }
     if(act==='cobrada'){ const val=a.dataset.v==='1'; marcarCobrada(c, a.dataset.n, val); refrescarCob(); toast(val?'Marcada como cobrada':'Marca quitada'); return; }
-    if(act==='visit'){ refreshRouteStart(); markVisited(c); if(S.scriptUrl) flushOutbox(true); toast('Visitado ✓'); closeSheet(); render(); maybeZoneDone(c.zona); }
+    if(act==='visit') conZonaDelDia(c, ()=>{ refreshRouteStart(); markVisited(c); if(S.scriptUrl) flushOutbox(true); toast('Visitado ✓'); closeSheet(); render(); maybeZoneDone(c.zona); });
     if(act==='unvisit'){ unmarkVisited(c); render(); openClient(c.id); }
     if(act==='edit') openForm(c);
     if(act==='resumen') saveResumen(c);
@@ -1379,6 +1503,7 @@ function openList(){
     h = `<h2>Zonas</h2><p class="sub">Elegí la zona del día. Cada una tiene entre ${S.minZona||8} y ${S.maxZona||12} clientes.</p><ul class="list">`;
     for(let z=0;z<k;z++){
       const all = S.clients.filter(c=>active(c)&&c.zona===z), pend = all.filter(c=>!isVisited(c)).length;
+      if(!all.length) continue;
       h += `<li style="--c:${zoneColor(z)}" data-z="${z}"><span class="num">${z+1}</span><span class="txt"><b>Zona ${z+1}</b><small>${pend ? pend+' pendientes de '+all.length : 'Completa'}</small></span></li>`;
     }
     h += '</ul>';
@@ -1399,7 +1524,7 @@ function openList(){
   const bv=document.getElementById('btnVerPlan'); if(bv) bv.onclick=mostrarPlan;
   sheetBody.onclick = e=>{
     const t = e.target.closest('[data-tick]');
-    if(t){ refreshRouteStart(); const c=S.clients.find(x=>x.id===t.dataset.tick); markVisited(c); if(S.scriptUrl) flushOutbox(true); render(); toast('Visitado ✓'); maybeZoneDone(c.zona); openList(); return; }
+    if(t){ const c=S.clients.find(x=>x.id===t.dataset.tick); const z0=UI.zone; conZonaDelDia(c, ()=>{ refreshRouteStart(); markVisited(c); if(S.scriptUrl) flushOutbox(true); render(); toast('Visitado ✓'); maybeZoneDone(c.zona); UI.zone=z0; openList(); }); return; }
     const li = e.target.closest('li'); if(!li) return;
     if(li.dataset.z!=null){ UI.zone=+li.dataset.z; refreshRouteStart(); render(); fitZone(); openList(); }
     else if(li.dataset.id) openClient(li.dataset.id);
@@ -1873,6 +1998,15 @@ async function syncSheet(silent){
   if(UI.geocoding){ if(!silent) toast('Esperá a que termine de ubicar clientes'); return; }
   if(syncing) return; syncing=true;
   try{ await syncSheetInner(silent); } finally { syncing=false; }
+  tareasDeZonas();
+}
+function tareasDeZonas(){
+  if(UI.geocoding || !S.clients.some(located)) return;
+  if(!S.zonasTopeV1 && zoneCount()){
+    const n=rebalancearZonas(); S.zonasTopeV1=true; save();
+    if(n){ render(); toast(`Se reacomodaron ${n} clientes de zonas que pasaban de ${S.maxZona||12}`, 5000); }
+  }
+  revisarDiaAnterior();
 }
 function ultimasVisitas(filas){
   const txt=new Map(), best=new Map();
@@ -2128,9 +2262,12 @@ function hoy(){ const d=new Date(); return String(d.getDate()).padStart(2,'0')+'
 function saveResumen(c){
   const t = document.getElementById('resumen').value.trim();
   if(!t){ toast('Escribí el resumen antes de guardar'); return; }
+  const yaVisitado = isVisited(c);
+  if(yaVisitado) guardarResumen(c, t, true); else conZonaDelDia(c, ()=>guardarResumen(c, t, false));
+}
+function guardarResumen(c, t, yaVisitado){
   const fecha = hoy();
   c.ultimaVisita = fecha+' - '+t;
-  const yaVisitado = isVisited(c);
   markVisited(c, t);
   save(); render(); openClient(c.id);
   toast(yaVisitado ? 'Resumen guardado' : 'Resumen guardado y visita marcada');
@@ -2797,6 +2934,7 @@ load();
 render();
 if(S.track) startTracking(false);
 setTimeout(()=>autoSync(true), 400);
+setTimeout(()=>{ if(!syncing) tareasDeZonas(); }, 6000);
 document.getElementById('nav').onclick=e=>{ const b=e.target.closest('[data-v]'); if(b) cambiarVista(b.dataset.v); };
 renderNavBadge();
 if(S.clients.some(located)) fitZone();
