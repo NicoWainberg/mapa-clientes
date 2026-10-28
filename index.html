@@ -893,6 +893,18 @@ li.pv .sc-est{color:#b86f00;font-weight:700}
 .comp .c2{text-align:right;flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .comp .c2 b{font-family:var(--cond);font-size:17px}
 /* Pin con deuda vencida */
+.list.revisar li{flex-wrap:wrap}
+.list.revisar .txt b,.list.revisar .txt small{white-space:normal}
+.list.revisar .acc{flex-basis:100%;display:flex;gap:8px;padding-left:42px}
+.razon{margin:-2px 0 6px;color:var(--ink-2);font-size:15px;font-weight:500}
+.dud{position:absolute;left:-6px;top:-6px;width:16px;height:16px;border-radius:50%;background:#e79a12;color:#fff;font:700 11px/16px var(--font);text-align:center;border:2px solid #fff;z-index:2;font-style:normal}
+.medios{display:flex;flex-wrap:wrap;gap:8px}
+.medios button{display:flex;align-items:center;gap:8px;min-height:42px;padding:0 12px;border-radius:10px;border:1.5px solid var(--line);background:var(--card);font-weight:600;font-size:14px;color:var(--ink)}
+.medios .chk{width:18px;height:18px;border-radius:5px;border:2px solid var(--ink-2);display:inline-grid;place-items:center;flex:none}
+.medios button[aria-pressed="true"]{border-color:#14313a;background:#e8eef0}
+.medios button[aria-pressed="true"] .chk{background:#14313a;border-color:#14313a}
+.medios button[aria-pressed="true"] .chk::after{content:"";width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
+@media (prefers-color-scheme:dark){.medios button[aria-pressed="true"]{background:#1f3a42;border-color:#9fb3b9}}
 .dbt{position:absolute;left:19px;top:-5px;width:12px;height:12px;border-radius:50%;background:var(--venc);border:2px solid #fff;z-index:2}
 </style>
 </head>
@@ -933,7 +945,7 @@ li.pv .sc-est{color:#b86f00;font-weight:700}
 const KEY = 'mapaClientes.v1';
 const COLORS = ['#e23d4f','#2f6fd6','#1f9a57','#e98300','#8e44ad','#0097a7','#d1408e','#6f8a00','#a85a1e','#4757d1','#b89400','#56707a','#c0392b','#16a085','#7d3c98','#2c7be5'];
 const FIELDS = [
-  ['codigo','Código'],['nombre','Nombre'],['direccion','Dirección'],['localidad','Localidad / barrio'],
+  ['codigo','Código'],['nombre','Nombre de fantasía'],['razon','Razón social'],['direccion','Dirección (calle y altura)'],['localidad','Localidad'],['partido','Partido'],
   ['contacto','Contacto'],['telefono','Teléfono'],['horario','Horario de atención'],['rubro','Rubro'],['notas','Comentarios']
 ];
 const IGNORE = n => !n || n.startsWith('zona') || n.startsWith('visita') || n.startsWith('empty');
@@ -992,7 +1004,7 @@ map.on('click', e => {
   if(UI.preview){ setPreviewPoint(e.latlng, null); showPreviewSheet(); return; }
   if(UI.placing){
     const c = S.clients.find(x=>x.id===UI.placing);
-    if(c){ c.lat=e.latlng.lat; c.lng=e.latlng.lng; c.geo='ok'; queueCampos(c, geoCampos(c)); assignNearestZone(c); save(); }
+    if(c){ c.lat=e.latlng.lat; c.lng=e.latlng.lng; c.geo='ok'; delete c.geoDudosa; delete c.geoNota; queueCampos(c, geoCampos(c)); assignNearestZone(c); save(); }
     UI.placing=null; hideBanner(); render(); if(c) openClient(c.id); toast('Ubicación guardada');
     return;
   }
@@ -1175,14 +1187,14 @@ function render(){
     const col = v ? '#9aa7ab' : zoneColor(c.zona);
     const html = dim
       ? `<div class="${cls}" style="--c:${col}"><span></span></div>`
-      : `<div class="pw"><div class="${cls}" style="--c:${col}"><span>${label}</span></div>${(deudaDe(c)||{}).vencido>0?'<i class="dbt" title="Deuda vencida"></i>':''}${showLbl?`<div class="lbl" style="--c:${col}"><b style="color:${col}">${esc(codeOf(c))}</b>${esc(c.nombre||'')}</div>`:''}</div>`;
+      : `<div class="pw"><div class="${cls}" style="--c:${col}"><span>${label}</span></div>${(deudaDe(c)||{}).vencido>0?'<i class="dbt" title="Deuda vencida"></i>':''}${c.geoDudosa?'<i class="dud" title="Ubicación a revisar">?</i>':''}${showLbl?`<div class="lbl" style="--c:${col}"><b style="color:${col}">${esc(codeOf(c))}</b>${esc(c.nombre||'')}</div>`:''}</div>`;
     const icon = L.divIcon({className:'', html, iconSize: dim?[14,14]:[30,30], iconAnchor: dim?[7,7]:[4,30]});
     // Separar pines con la misma dirección
     const key = c.lat.toFixed(5)+','+c.lng.toFixed(5); const n = seen.get(key)||0; seen.set(key,n+1);
     const ll = n ? [c.lat+Math.sin(n*2.1)*0.00013*Math.ceil(n/3+0.01), c.lng+Math.cos(n*2.1)*0.00016*Math.ceil(n/3+0.01)] : [c.lat,c.lng];
     const m = L.marker(ll,{icon, draggable: UI.moving===c.id, zIndexOffset: inZone?(UI.selected===c.id?1000:500):0, keyboard:true, title:codeOf(c)+' '+(c.nombre||'')});
     m.on('click', ()=>{ if(UI.placing||UI.moving) return; openClient(c.id); });
-    if(UI.moving===c.id) m.on('dragend', ev=>{ const p=ev.target.getLatLng(); c.lat=p.lat; c.lng=p.lng; queueCampos(c, geoCampos(c)); save(); });
+    if(UI.moving===c.id) m.on('dragend', ev=>{ const p=ev.target.getLatLng(); c.lat=p.lat; c.lng=p.lng; delete c.geoDudosa; delete c.geoNota; queueCampos(c, geoCampos(c)); save(); });
     m.addTo(layer); markers.set(c.id,m);
   });
   renderTop();
@@ -1238,6 +1250,7 @@ sheet.addEventListener('touchstart',e=>{ if(sheetBody.scrollTop<=0) touchY=e.tou
 sheet.addEventListener('touchend',e=>{ if(touchY!=null && !UI.preview && e.changedTouches[0].clientY-touchY>90) closeSheet(); touchY=null; });
 
 function waPhone(t){ let d=String(t||'').replace(/\D/g,''); if(!d) return ''; d=d.replace(/^0+/,''); if(!d.startsWith('54')) d='549'+d; return d; }
+function telefonos(c){ return String(c.telefono||'').split(/\s*[\/,;]\s*|\s+-\s+/).map(x=>x.trim()).filter(x=>x.replace(/\D/g,'').length>=8); }
 function telHref(t){ return 'tel:'+String(t||'').replace(/[^\d+]/g,''); }
 function navUrl(c){ return `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}&travelmode=driving`; }
 
@@ -1248,16 +1261,16 @@ function openClient(id, tab){
   const v = isVisited(c);
   const extras = Object.entries(c.extra||{}).filter(([k,val])=>String(val).trim());
   let h = `<span class="codebig" style="--c:${c.baja?'#9aa7ab':zoneColor(c.zona)}">${esc(codeOf(c))}</span>
-  <h2>${esc(c.nombre||'Sin nombre')}</h2>
+  <h2>${esc(c.nombre||'Sin nombre')}</h2>${c.razon && norm(c.razon)!==norm(c.nombre)?`<p class="razon">${esc(c.razon)}</p>`:''}
   <span class="zonetag" style="--c:${zoneColor(c.zona)}"><i></i>${c.baja?'No existe más':c.zona!=null?'Zona '+(c.zona+1):'Sin zona'}${c.rubro?' &nbsp;|&nbsp; '+esc(c.rubro):''}</span>
-  <p class="sub">${esc(c.direccion)}${c.localidad?', '+esc(c.localidad):''}${UI.me&&located(c)?` <b>(a ${kmTo(c)})</b>`:''}</p>`;
+  <p class="sub">${esc(c.direccion)}${c.localidad?', '+esc(c.localidad):''}${c.partido&&norm(c.partido)!==norm(c.localidad)?' ('+esc(c.partido)+')':''}${UI.me&&located(c)?` <b>(a ${kmTo(c)})</b>`:''}</p>${c.geoDudosa?`<p class="pend">Ubicación a revisar: ${esc(c.geoNota||'')}</p>`:''}`;
   const cab = h; h = '';
   if(v) h += `<div class="done-note">Visitado el ${new Date(c.visitFecha).toLocaleDateString('es-AR',{day:'numeric',month:'numeric'})}</div>`;
   h += `<div class="row">${v
       ? `<button class="btn" data-act="unvisit">Desmarcar visita</button>`
       : `<button class="btn go" data-act="visit">✓ Marcar como visitado</button>`}
     ${located(c)?`<a class="btn dark" href="${navUrl(c)}" target="_blank" rel="noopener">Cómo llegar</a>`:''}
-    ${c.telefono?`<a class="btn" href="${telHref(c.telefono)}">Llamar</a><a class="btn" href="https://wa.me/${waPhone(c.telefono)}" target="_blank" rel="noopener">WhatsApp</a>`:''}
+    ${telefonos(c).map((t,k,a)=>`<a class="btn" href="${telHref(t)}">Llamar${a.length>1?' '+t.slice(-4):''}</a><a class="btn" href="https://wa.me/${waPhone(t)}" target="_blank" rel="noopener">WhatsApp${a.length>1?' '+t.slice(-4):''}</a>`).join('')}
   </div>`;
   const est = estadoAhora(c);
   const rows = [['Contacto',c.contacto],['Teléfono',c.telefono],['Horario',horarioTexto(c)],...(est?[['Ahora',est.txt]]:[]),...extras];
@@ -1287,7 +1300,7 @@ function openClient(id, tab){
   sheetBody.onclick = e=>{
     const a = e.target.closest('[data-act]'); if(!a) return;
     const act = a.dataset.act;
-    if(act==='medio'){ c.medio = c.medio===a.dataset.v ? '' : a.dataset.v; queueCampos(c,{medio:c.medio}); save(); refrescarCob(); return; }
+    if(act==='medio'){ const l=mediosDe(c), v=a.dataset.v; const n=l.indexOf(v)>=0 ? l.filter(x=>x!==v) : l.concat(v); c.medio=MEDIOS.filter(m=>n.indexOf(m)>=0).join(', '); queueCampos(c,{medio:c.medio}); save(); refrescarCob(); return; }
     if(act==='cobrada'){ const val=a.dataset.v==='1'; marcarCobrada(c, a.dataset.n, val); refrescarCob(); toast(val?'Marcada como cobrada':'Marca quitada'); return; }
     if(act==='visit'){ refreshRouteStart(); markVisited(c); if(S.scriptUrl) flushOutbox(true); toast('Visitado ✓'); closeSheet(); render(); maybeZoneDone(c.zona); }
     if(act==='unvisit'){ unmarkVisited(c); render(); openClient(c.id); }
@@ -1403,6 +1416,7 @@ function openEmpty(){ openSheet(emptyHtml()); sheetBody.onclick=null; bindSheetF
 /* ============ Menú ============ */
 function openMenu(){
   const fail = S.clients.filter(c=>!located(c)&&active(c)).length;
+  const dudas = S.clients.filter(c=>located(c)&&active(c)&&c.geoDudosa).length;
   const bajas = S.clients.filter(c=>c.baja).length;
   const sync = S.lastSync ? new Date(S.lastSync).toLocaleString('es-AR',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}) : 'nunca';
   const h = `<h2>Ajustes</h2><div class="menu">
@@ -1412,7 +1426,7 @@ function openMenu(){
     <button data-m="hist">Historial de visitas</button>
     <button data-m="import">Importar Excel <small>.xlsx o .csv</small></button>
     <button data-m="add">Agregar cliente</button>
-    ${fail?`<button data-m="fail">Clientes sin ubicar <small>${fail}</small></button>`:''}
+    ${fail||dudas?`<button data-m="fail">Ubicaciones a revisar <small>${fail+dudas}</small></button>`:''}
     ${bajas?`<button data-m="bajas">Clientes ocultos <small>${bajas}</small></button>`:''}
     ${watchId!=null?'<button data-m="stoptrack">Dejar de seguir mi ubicación</button>':''}
     <button data-m="visited">${S.showVisited?'Ocultar':'Mostrar'} visitados</button>
@@ -1478,16 +1492,23 @@ function openZoneForm(){
 }
 
 function openFailed(){
-  const list = S.clients.filter(c=>!located(c)&&active(c));
-  openSheet(`<h2>Sin ubicar (${list.length})</h2><p class="sub">No se encontró la dirección. Reintentá, corregila en la planilla o ubicá el cliente tocando el mapa.</p>
-  <div class="row"><button class="btn dark" id="retryGeo">Reintentar búsqueda</button></div>
-  <ul class="list">${list.map(c=>`<li style="--c:#c2410c"><span class="num">!</span><span class="txt"><b><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre)}</b><small>${esc(c.direccion)}${c.localidad?', '+esc(c.localidad):''}</small></span>
-  <button class="btn small" data-e="${c.id}">Editar</button><button class="btn small" data-p="${c.id}">Ubicar</button></li>`).join('')}</ul>`);
-  document.getElementById('retryGeo').onclick = ()=>{ list.forEach(c=>c.geo='pending'); save(); geocodeAll(); };
+  const sin = S.clients.filter(c=>!located(c)&&active(c));
+  const dud = S.clients.filter(c=>located(c)&&active(c)&&c.geoDudosa);
+  const item = (c, dudosa) => `<li style="--c:${dudosa?'#e79a12':'#c2410c'}"><span class="num">${dudosa?'?':'!'}</span><span class="txt"><b><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre)}</b><small>${esc(c.direccion)}${c.localidad?', '+esc(c.localidad):''}${c.partido?' ('+esc(c.partido)+')':''}</small>${c.geoNota?`<small>${esc(c.geoNota)}</small>`:''}</span>
+    <span class="acc">${dudosa?`<button class="btn small" data-v="${c.id}">Ver</button><button class="btn small" data-ok="${c.id}">Está bien</button>`:`<button class="btn small" data-e="${c.id}">Editar</button>`}<button class="btn small" data-p="${c.id}">${dudosa?'Mover':'Ubicar'}</button></span></li>`;
+  openSheet(`<h2>Ubicaciones a revisar</h2>
+  ${dud.length?`<h3>Revisar en el mapa (${dud.length})</h3><p class="sub">Se encontró la calle pero no la altura exacta. Tocá "Ver" para revisar el punto; si está bien, confirmalo, y si no, movelo.</p><ul class="list revisar">${dud.map(c=>item(c,true)).join('')}</ul>`:''}
+  ${sin.length?`<h3>Sin ubicar (${sin.length})</h3><p class="sub">No se encontraron, o lo que se encontró estaba en otro partido. Ubicalos tocando el mapa o corregí la dirección.</p>
+  <div class="row"><button class="btn dark" id="retryGeo">Reintentar búsqueda</button></div><ul class="list revisar">${sin.map(c=>item(c,false)).join('')}</ul>`:''}
+  ${!dud.length&&!sin.length?'<div class="empty"><p>No hay ubicaciones pendientes de revisión.</p></div>':''}`);
+  const rg=document.getElementById('retryGeo'); if(rg) rg.onclick = ()=>{ sin.forEach(c=>c.geo='pending'); save(); geocodeAll(); };
   sheetBody.onclick = e=>{
-    const ed = e.target.closest('[data-e]'), pl = e.target.closest('[data-p]');
-    if(ed) openForm(S.clients.find(c=>c.id===ed.dataset.e));
-    if(pl){ const c=S.clients.find(x=>x.id===pl.dataset.p); UI.placing=c.id; closeSheet(); showBanner(`Tocá el mapa donde está ${c.nombre||'el cliente'}`,'Cancelar',()=>{UI.placing=null;hideBanner();}); }
+    const ed = e.target.closest('[data-e]'), pl = e.target.closest('[data-p]'), ve = e.target.closest('[data-v]'), ok = e.target.closest('[data-ok]');
+    const cli = el => S.clients.find(c=>c.id===el.dataset[Object.keys(el.dataset)[0]]);
+    if(ed) openForm(cli(ed));
+    if(ve){ const c=cli(ve); map.setView([c.lat,c.lng],17); openClient(c.id); }
+    if(ok){ const c=cli(ok); delete c.geoDudosa; delete c.geoNota; queueCampos(c, geoCampos(c)); save(); render(); toast('Ubicación confirmada'); openFailed(); }
+    if(pl){ const c=cli(pl); UI.placing=c.id; closeSheet(); if(located(c)) map.setView([c.lat,c.lng],17); showBanner(`Tocá el mapa donde está ${c.nombre||'el cliente'}`,'Cancelar',()=>{UI.placing=null;hideBanner();}); }
   };
 }
 
@@ -1514,7 +1535,6 @@ function openForm(c, draft, horarioSug){
     if(data.horario){ const r=parseRangos(data.horario).length ? parseRangos(data.horario) : sugerirHorario(data.horario);
       if(!r){ toast('No entendí el horario. Escribilo así: 8-12:30 y 15-19'); return; }
       data.horario=fmtHorario(r); }
-    if(data.localidad && S.scriptUrl){ data.direccion=[data.direccion,data.localidad].filter(Boolean).join(', '); data.localidad=''; }
     if(!data.nombre && !data.direccion){ toast('Completá al menos nombre o dirección'); return; }
     const extra = {}; sheetBody.querySelectorAll('[data-k]').forEach(i=>extra[i.dataset.k]=i.value.trim());
     if(isNew){
@@ -1630,7 +1650,7 @@ function confirmPreview(){
   S.clients.push(c);
   S.outbox = S.outbox||[];
   S.outbox.push(Object.assign({id:uid(), tipo:'alta', clientId:c.id, codigo:c.codigo||'', nombre:c.nombre||'', direccion:c.direccion||'',
-    localidad:c.localidad||'', contacto:c.contacto||'', telefono:c.telefono||'', horario:c.horario||'', rubro:c.rubro||'',
+    razon:c.razon||'', localidad:c.localidad||'', partido:c.partido||'', contacto:c.contacto||'', telefono:c.telefono||'', horario:c.horario||'', rubro:c.rubro||'',
     notas:c.notas||'', estado:'Activo', gid:gidActual()}, geoCampos(c)));
   assignNearestZone(c);
   save();
@@ -1813,7 +1833,7 @@ function clientesDeScript(lista, visitas){
   return lista.map(o=>({
     id:uid(), geo:'pending', zona:null, visitado:null, extra:o.extras||{},
     codigo:o.codigo||'', nombre:o.nombre||'', direccion:o.direccion||'', telefono:o.telefono||'',
-    contacto:o.contacto||'', rubro:o.rubro||'', notas:o.notas||'', horario:o.horario||'', plazo:o.plazo||'', medio:o.medio||'',
+    razon:o.razon||'', localidad:o.localidad||'', partido:o.partido||'', contacto:o.contacto||'', rubro:o.rubro||'', notas:o.notas||'', horario:o.horario||'', plazo:o.plazo||'', medio:o.medio||'',
     ultimaVisita: ult.get(norm(o.codigo)) || ult.get('n:'+norm(o.nombre)) || '',
     _lat:o.lat, _lng:o.lng, _zona:o.zona, _estado:o.estado
   }));
@@ -1890,28 +1910,50 @@ function cleanAddr(t){
     .replace(/\s+,/g,',').replace(/,\s*,/g,',').replace(/\s{2,}/g,' ').trim().replace(/,$/,'');
 }
 async function nominatim(q){
-  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ar&accept-language=es&viewbox=-59.4,-34.1,-57.7,-35.2&q='+encodeURIComponent(q);
+  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=ar&accept-language=es&viewbox=-59.4,-34.1,-57.7,-35.2&q='+encodeURIComponent(q);
   const r = await fetch(url,{headers:{'Accept':'application/json'}});
   if(!r.ok) throw new Error(r.status);
-  const j = await r.json(); return j[0] || null;
+  const j = await r.json(); return Array.isArray(j) ? j : [];
 }
+// ¿El resultado está en el partido (o la localidad) esperados?
+function geoValida(hit, c){
+  const dn = norm(hit.display_name||'');
+  if(c.partido) return dn.includes(norm(c.partido));
+  if(c.localidad) return dn.includes(norm(c.localidad));
+  return true;
+}
+// Encontró el número exacto o solo la calle
+function geoExacta(hit){ return /^\d/.test(String(hit.display_name||'').trim()); }
 async function geocodeOne(c){
+  delete c.geoDudosa; delete c.geoNota;
+  if(/ubicar a mano/i.test(c.notas||'')){ c.geo='fail'; c.geoNota='Marcado para ubicar a mano'; return false; }
   const dir = cleanAddr(c.direccion);
   const calle = dir.split(',')[0].trim();
-  const caba = /ciudad aut|capital federal/i.test(dir);
-  const full = [dir, c.localidad, /buenos aires/i.test(dir)?'':'Buenos Aires', 'Argentina'].filter(Boolean).join(', ');
-  // Intentos: dirección completa, luego solo calle y número, luego sin "Avenida"
-  const tries = [full];
-  const base = c.localidad ? ', '+c.localidad : (caba ? ', Ciudad Autónoma de Buenos Aires' : '');
-  tries.push(calle + base + ', Buenos Aires, Argentina');
-  if(/^Avenida /i.test(calle)) tries.push(calle.replace(/^Avenida /i,'') + base + ', Buenos Aires, Argentina');
+  const caba = /ciudad aut|capital federal/i.test(norm(c.partido||'')+' '+norm(dir));
+  const par = c.partido ? (caba ? 'Ciudad Autónoma de Buenos Aires' : 'Partido de '+c.partido) : '';
+  const prov = caba ? 'Argentina' : 'Buenos Aires, Argentina';
+  const armar = partes => partes.filter(Boolean).join(', ');
+  const tries = [];
+  const agregar = q => { if(q && tries.indexOf(q)<0) tries.push(q); };
+  agregar(armar([calle, c.localidad, par, prov]));
+  agregar(armar([calle, par, prov]));
+  if(!c.partido) agregar(armar([dir, c.localidad, /buenos aires/i.test(dir)?'':'Buenos Aires', 'Argentina']));
+  if(/^Avenida /i.test(calle)) agregar(armar([calle.replace(/^Avenida /i,''), c.localidad, par, prov]));
+  let aprox=null, fuera=null;
   try{
     for(let i=0;i<tries.length;i++){
       if(i) await sleep(1100);
-      const hit = await nominatim(tries[i]);
-      if(hit){ c.lat=+hit.lat; c.lng=+hit.lon; c.geo='ok'; c._found=hit.display_name||''; return true; }
+      const res = await nominatim(tries[i]);
+      for(const hit of res){
+        if(!geoValida(hit, c)){ if(!fuera) fuera=hit; continue; }
+        if(geoExacta(hit)){ c.lat=+hit.lat; c.lng=+hit.lon; c.geo='ok'; c._found=hit.display_name||''; return true; }
+        if(!aprox) aprox=hit;
+      }
     }
-    c.geo='fail'; return false;
+    if(aprox){ c.lat=+aprox.lat; c.lng=+aprox.lon; c.geo='ok'; c._found=aprox.display_name||''; c.geoDudosa=true; c.geoNota='Se encontró la calle pero no la altura exacta'; return true; }
+    c.geo='fail';
+    c.geoNota = fuera ? 'La dirección encontrada no está en '+(c.partido||c.localidad) : 'No se encontró la dirección';
+    return false;
   }catch(e){ c.geo='pending'; c._err=true; return false; }
 }
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
@@ -1933,7 +1975,7 @@ async function geocodeAll(primeraCarga){
     if(stop) break;
     i++; document.getElementById('bannerTxt').textContent = `Ubicando clientes: ${i} de ${todo.length}`;
     const okG = await geocodeOne(c);
-    if(okG) queueCampos(c, geoCampos(c), true);
+    if(okG && !c.geoDudosa) queueCampos(c, geoCampos(c), true);
     save();
     if(c._err){ stop=true; break; } // este dispositivo no puede usar el buscador
     if(i%10===0) render();
@@ -1947,8 +1989,8 @@ function afterGeocode(){
   if(!zoneCount()) computeZones();
   else S.clients.filter(c=>active(c)&&located(c)&&c.zona==null).forEach(assignNearestZone);
   save(); UI.zone='all'; render(); fitZone();
-  const fail = S.clients.filter(c=>!located(c)&&active(c)).length;
-  if(fail) showBanner(`${fail} direcciones sin ubicar`,'Revisar',()=>{hideBanner();openFailed();});
+  const fail = S.clients.filter(c=>!located(c)&&active(c)).length, dud = S.clients.filter(c=>c.geoDudosa&&active(c)).length;
+  if(fail||dud) showBanner(`${fail?fail+' sin ubicar':''}${fail&&dud?' · ':''}${dud?dud+' a revisar':''}`,'Revisar',()=>{hideBanner();openFailed();});
   else toast(`${zoneCount()} zonas armadas`);
 }
 function checkPending(){
@@ -2419,7 +2461,8 @@ function mostrarPlan(){
 }
 
 /* ============ Cobranzas ============ */
-const MEDIOS=['Efectivo','Transferencia','Cheque'];
+const MEDIOS=['Cta Cte','Cheque','Transferencia','Efectivo','Listado'];
+function mediosDe(c){ const l=String(c.medio||'').split(/\s*[,;\/]\s*/).map(x=>x.trim()).filter(Boolean); return MEDIOS.filter(m=>l.some(x=>norm(x)===norm(m))); }
 const DIAS_AVISO=3, DIAS_COBRADA=10;
 function plata(n){ const v=Math.round(Number(n)||0); return (v<0?'-$ ':'$ ')+Math.abs(v).toLocaleString('es-AR'); }
 function plataCorta(n){ const v=Math.abs(Number(n)||0); const s=(n<0?'-':''); if(v>=1e6) return s+'$ '+(v/1e6).toLocaleString('es-AR',{maximumFractionDigits:1})+' M'; if(v>=1e4) return s+'$ '+Math.round(v/1e3).toLocaleString('es-AR')+' mil'; return plata(n); }
@@ -2475,7 +2518,7 @@ function cobranzasHtml(c){
     h+=`<div class="cob-res">${dd.vencido>0?`<span class="t-venc">Vencido ${plata(dd.vencido)}</span>`:''}${dd.porVencer>0?`<span class="t-pv">Por vencer ${plata(dd.porVencer)}</span>`:''}${dd.vencido<=0&&dd.porVencer<=0?'<span class="t-ok">Nada vencido</span>':''}</div>`;
   }
   h+=`<div class="cob-conf"><label for="cobPlazo">Plazo de pago</label><div class="plazo"><input id="cobPlazo" type="number" min="0" max="365" inputmode="numeric" value="${plazo}" placeholder="30"><span>días</span></div>
-    <label>Medio de pago</label><div class="seg" role="group">${MEDIOS.map(m=>`<button type="button" data-act="medio" data-v="${m}" aria-pressed="${c.medio===m}">${m}</button>`).join('')}</div></div>`;
+    <label>Formas de pago habilitadas</label><div class="medios" role="group">${MEDIOS.map(m=>`<button type="button" data-act="medio" data-v="${m}" aria-pressed="${mediosDe(c).indexOf(m)>=0}"><span class="chk" aria-hidden="true"></span>${m}</button>`).join('')}</div></div>`;
   if(dd){
     h+=`<h3>Comprobantes</h3><ul class="comp">`+dd.items.map(x=>{
       const cls={vencida:'venc',porvencer:'pv',aldia:'ok',cobrada:'cob',credito:'cred'}[x.estado];
@@ -2558,7 +2601,7 @@ function renderCob(){
       const est=d.vencido>0?'venc':d.porVencer>0?'pv':'ok';
       return `<li data-id="${c.id}" class="${est}"><div class="sc-top"><span class="sc-nom"><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre)}</span><b>${plata(d.saldo)}</b></div>
         <div class="bar" aria-hidden="true"><i class="s-venc" style="width:${d.vencido/max*100}%"></i><i class="s-pv" style="width:${d.porVencer/max*100}%"></i><i class="s-ok" style="width:${okD/max*100}%"></i></div>
-        <div class="sc-sub"><span class="sc-est">${textoEstadoCliente(d)}</span>${d.vencido>0?`<span>Vencido ${plataCorta(d.vencido)}</span>`:''}${c.medio?`<span>${esc(c.medio)}</span>`:''}${c.zona!=null?`<span class="sc-z" style="--c:${zoneColor(c.zona)}">Zona ${c.zona+1}</span>`:''}</div></li>`;
+        <div class="sc-sub"><span class="sc-est">${textoEstadoCliente(d)}</span>${d.vencido>0?`<span>Vencido ${plataCorta(d.vencido)}</span>`:''}${mediosDe(c).length?`<span>${esc(mediosDe(c).join(' · '))}</span>`:''}${c.zona!=null?`<span class="sc-z" style="--c:${zoneColor(c.zona)}">Zona ${c.zona+1}</span>`:''}</div></li>`;
     }).join('')+`</ul>`;
   }
   box.innerHTML=h;
@@ -2572,11 +2615,11 @@ function renderCob(){
 
 /* ============ Búsqueda ============ */
 function openSearch(){
-  openSheet(`<h2>Buscar cliente</h2><input id="q" type="search" placeholder="Código, nombre o dirección" autocomplete="off"><ul class="list" id="qres"></ul>`);
+  openSheet(`<h2>Buscar cliente</h2><input id="q" type="search" placeholder="Código, nombre, razón social o dirección" autocomplete="off"><ul class="list" id="qres"></ul>`);
   sheetBody.onclick = e=>{ const li=e.target.closest('li[data-id]'); if(!li) return; const c=S.clients.find(x=>x.id===li.dataset.id); if(c&&located(c)) map.setView([c.lat,c.lng],16); openClient(li.dataset.id); };
   const q = document.getElementById('q'), out = document.getElementById('qres');
   const run = ()=>{ const t=norm(q.value); if(!t){ out.innerHTML=''; return; }
-    const res = S.clients.filter(c=>norm(codeOf(c)+' '+c.nombre+' '+c.direccion).includes(t)).slice(0,30);
+    const res = S.clients.filter(c=>norm(codeOf(c)+' '+c.nombre+' '+(c.razon||'')+' '+c.direccion+' '+(c.localidad||'')).includes(t)).slice(0,30);
     out.innerHTML = res.length ? res.map(c=>`<li data-id="${c.id}" style="--c:${c.baja?'#9aa7ab':zoneColor(c.zona)}"><span class="num">${c.baja?'×':isVisited(c)?'✓':c.zona!=null?c.zona+1:'?'}</span><span class="txt"><b><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre)}</b><small>${esc(c.direccion)}</small></span></li>`).join('') : '<li><span class="txt"><small>Sin resultados</small></span></li>';
   };
   q.addEventListener('input', run); setTimeout(()=>q.focus(),250);

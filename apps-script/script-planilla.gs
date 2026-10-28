@@ -21,8 +21,8 @@
  * instalarActualizacionDiaria) y también desde el botón "Actualizar" de la app.
  */
 const H_CLIENTES = 'Clientes', H_VISITAS = 'Visitas', H_MAPA = 'Mapa';
-const COLS_CLIENTES = ['Código', 'Nombre', 'Dirección', 'Teléfono', 'Contacto', 'Rubro', 'Comentarios', 'Horario', 'Plazo de pago', 'Medio de pago', 'Zona', 'Estado', 'Deuda', 'Última visita', 'Último resumen'];
-const CAMPO_COL = { codigo: 'codigo', nombre: 'nombre', direccion: 'direccion', telefono: 'telefono', contacto: 'contacto', rubro: 'rubro', notas: 'comentarios', horario: 'horario', plazo: 'plazo de pago', medio: 'medio de pago', zona: 'zona', estado: 'estado' };
+const COLS_CLIENTES = ['Código', 'Nombre', 'Razón social', 'Dirección', 'Localidad', 'Partido', 'Teléfono', 'Contacto', 'Rubro', 'Comentarios', 'Horario', 'Plazo de pago', 'Medio de pago', 'Zona', 'Estado', 'Deuda', 'Última visita', 'Último resumen'];
+const CAMPO_COL = { codigo: 'codigo', nombre: 'nombre', razon: 'razon social', direccion: 'direccion', localidad: 'localidad', partido: 'partido', telefono: 'telefono', contacto: 'contacto', rubro: 'rubro', notas: 'comentarios', horario: 'horario', plazo: 'plazo de pago', medio: 'medio de pago', zona: 'zona', estado: 'estado' };
 const H_DEUDAS = 'Deudas', H_COBRADAS = 'Cobradas';
 const SISTEMA = 'https://tresgeventas.com.ar';
 const COLS_VISITAS = ['Fecha', 'Hora', 'Código', 'Nombre', 'Dirección', 'Zona', 'Resumen'];
@@ -122,10 +122,12 @@ function findRow(data, idx, d) {
   return -1;
 }
 
-function prepararCampos(c0) {
+function prepararCampos(c0, idx) {
   const c = Object.assign({}, c0);
-  if (c.localidad) c.direccion = [c.direccion, c.localidad].filter(Boolean).join(', ');
-  delete c.localidad;
+  if (!(idx && idx.localidad >= 0)) {
+    if (c.localidad) c.direccion = [c.direccion, c.localidad].filter(Boolean).join(', ');
+    delete c.localidad;
+  }
   Object.keys(c).forEach(k => { c[k] = c[k] == null ? '' : String(c[k]); });
   return c;
 }
@@ -136,7 +138,7 @@ function alta(ss, d) {
   const idx = idxClientes(cl);
   const existente = findRow(data, idx, d);
   if (existente >= 0) return { ok: true, existente: true, codigo: data[existente][idx.codigo] };
-  const c = prepararCampos(d);
+  const c = prepararCampos(d, idx);
   let cod = String(c.codigo || '').trim();
   if (!cod || esSinCodigo(cod)) cod = nuevoCodigoSC(data.map(f => f[idx.codigo]));
   c.codigo = cod;
@@ -157,7 +159,7 @@ function aplicarLote(ss, items) {
   const res = items.map(it => {
     const r = findRow(data, idx, it.orig || {});
     if (r < 0) return { ok: false, error: 'Cliente no encontrado en la planilla' };
-    const c = prepararCampos(it.campos || {});
+    const c = prepararCampos(it.campos || {}, idx);
     const codViejo = data[r][idx.codigo];
     if (c.codigo !== undefined) {
       if (!c.codigo.trim() || esSinCodigo(c.codigo)) delete c.codigo;
@@ -263,6 +265,9 @@ function estructura(ss) {
   if (!(ss.getSheetByName(H_CLIENTES) && ss.getSheetByName(H_MAPA) && ss.getSheetByName(H_VISITAS))) migrar(ss);
   asegurarHorario(ss);
   const cl = ss.getSheetByName(H_CLIENTES);
+  asegurarColumna(cl, 'Razón social', 'nombre', '@');
+  asegurarColumna(cl, 'Localidad', 'direccion', '@');
+  asegurarColumna(cl, 'Partido', 'localidad', '@');
   asegurarColumna(cl, 'Plazo de pago', 'horario', '@');
   asegurarColumna(cl, 'Medio de pago', 'plazo de pago', '@');
   asegurarColumna(cl, 'Deuda', 'estado', '"$"#,##0.00');
@@ -333,7 +338,7 @@ function migrar(ss) {
   const valores = filas.map((f, r) => {
     const dir = [val(f, i.direccion), val(f, i.localidad)].filter(Boolean).join(', ');
     const est = /oculto/i.test(val(f, i.estado)) ? 'Oculto' : 'Activo';
-    return [todos[r], val(f, i.nombre), dir, val(f, i.telefono), val(f, i.contacto), val(f, i.rubro), val(f, i.notas), '', '', '',
+    return [todos[r], val(f, i.nombre), '', val(f, i.direccion), val(f, i.localidad), '', val(f, i.telefono), val(f, i.contacto), val(f, i.rubro), val(f, i.notas), '', '', '',
             est === 'Oculto' ? '' : val(f, i.zona), est, '', '', ''].concat(extras.map(k => val(f, k)));
   });
   cl.getRange(1, 1, valores.length + 1, encab.length).setNumberFormat('@').setValues([encab].concat(valores));
