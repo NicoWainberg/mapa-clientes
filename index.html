@@ -2460,25 +2460,101 @@ function textosCliente(c){
   return t;
 }
 function sugerenciasHorario(){
-  S.horDesc = S.horDesc||{};
+  S.horDesc = S.horDesc||{}; S.horOSM = S.horOSM||{};
   return S.clients.filter(c=>active(c) && !c.horario && !S.horDesc[c.id]).map(c=>{
     const fuentes=textosCliente(c); let rangos=null, fuente='';
     for(const f of fuentes){ const r=sugerirHorario(f); if(r){ rangos=unirRangos((rangos||[]).concat(r)); if(!fuente) fuente=f; } }
-    return rangos ? {c, rangos, fuente} : null;
+    if(rangos) return {c, rangos, fuente};
+    const o=S.horOSM[c.id];
+    if(o && o.rangos && o.rangos.length) return {c, rangos:o.rangos, fuente:`OpenStreetMap: ${o.nombre||'comercio sin nombre'} a ${o.dist} m · ${o.oh}`, osm:true, dudoso:!o.nombreOk};
+    return null;
   }).filter(Boolean);
+}
+
+/* ---- Horarios desde OpenStreetMap (gratis, sin clave) ---- */
+const OVERPASS=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
+const DIAS_OSM=['Mo','Tu','We','Th','Fr','Sa','Su'];
+// Devuelve los rangos de lunes a viernes de un opening_hours de OSM (ej: "Mo-Fr 08:00-12:30,15:00-19:00; Sa 08:00-13:00")
+function rangosOSM(oh){
+  oh=String(oh||'').trim(); if(!oh) return null;
+  if(/^24\/7$/.test(oh)) return null; // no sirve para planificar
+  let porDia={};
+  oh.split(';').forEach(regla=>{
+    regla=regla.trim(); if(!regla) return;
+    if(/^(PH|SH)\b/.test(regla)) return;
+    const m=regla.match(/^((?:(?:Mo|Tu|We|Th|Fr|Sa|Su)(?:\s*-\s*(?:Mo|Tu|We|Th|Fr|Sa|Su))?\s*,?\s*)+)\s*(.*)$/);
+    let dias=[0,1,2,3,4,5,6], resto=regla;
+    if(m){ dias=[]; resto=m[2];
+      m[1].split(',').forEach(tok=>{ tok=tok.trim(); if(!tok) return; const r=tok.split(/\s*-\s*/); const a=DIAS_OSM.indexOf(r[0]), b=DIAS_OSM.indexOf(r[1]||r[0]);
+        if(a<0||b<0) return; for(let i=a;;i=(i+1)%7){ dias.push(i); if(i===b) break; } }); }
+    else if(!/^\d/.test(regla)) return; // reglas con meses o fechas: se ignoran
+    if(/\b(off|closed)\b/i.test(resto)){ dias.forEach(d=>porDia[d]=[]); return; }
+    const rg=[]; let t; const re=/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/g;
+    while((t=re.exec(resto))){ const a=hm(t[1],t[2]), b=hm(t[3],t[4]); if(b>a) rg.push([a,b]); }
+    if(rg.length) dias.forEach(d=>porDia[d]=rg);
+  });
+  // el horario que más se repite entre lunes y viernes
+  const cuenta={}; [0,1,2,3,4].forEach(d=>{ const r=porDia[d]; if(r&&r.length){ const k=JSON.stringify(unirRangos(r)); cuenta[k]=(cuenta[k]||0)+1; } });
+  const k=Object.keys(cuenta).sort((a,b)=>cuenta[b]-cuenta[a])[0];
+  return k ? JSON.parse(k) : null;
+}
+const PAL_GENERICAS=/^(ferreteria|ferreteria|pintureria|corralon|bulonera|buloneria|sanitarios|materiales|construccion|electricidad|casa|srl|sa|sh|de|del|la|el|los|las|y|ind|industrial|comercial|distribuidora|herramientas)$/;
+function palabrasNombre(t){ return norm(t).replace(/[^a-z0-9ñ ]/g,' ').split(' ').filter(w=>w.length>=3 && !PAL_GENERICAS.test(w)); }
+function nombreCoincide(c, nom){
+  const a=palabrasNombre(nom); if(!a.length) return false;
+  const b=palabrasNombre((c.nombre||'')+' '+(c.razon||''));
+  return a.some(w=>b.some(x=>x===w || (w.length>=5 && (x.startsWith(w)||w.startsWith(x)))));
+}
+async function buscarHorariosOSM(){
+  const cl=S.clients.filter(c=>active(c) && located(c) && !c.horario);
+  if(!cl.length) return {buscados:0, encontrados:0};
+  const la=cl.map(c=>c.lat), lo=cl.map(c=>c.lng), pad=0.003;
+  const bbox=[Math.min(...la)-pad, Math.min(...lo)-pad, Math.max(...la)+pad, Math.max(...lo)+pad].map(x=>x.toFixed(5)).join(',');
+  const q=`[out:json][timeout:90];nwr["opening_hours"](${bbox});out center tags;`;
+  let j=null, err=null;
+  for(const url of OVERPASS){
+    try{ const r=await fetch(url,{method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'data='+encodeURIComponent(q)});
+      if(!r.ok) throw new Error('HTTP '+r.status); j=await r.json(); break; }catch(e){ err=e; }
+  }
+  if(!j) throw err||new Error('sin respuesta');
+  const lugares=(j.elements||[]).map(e=>({lat:e.lat!=null?e.lat:(e.center&&e.center.lat), lng:e.lon!=null?e.lon:(e.center&&e.center.lon), t:e.tags||{}}))
+    .filter(x=>x.lat!=null && x.t.opening_hours).map(x=>Object.assign(x,{p:xy({lat:x.lat,lng:x.lng})}));
+  S.horOSM=S.horOSM||{}; let n=0;
+  cl.forEach(c=>{
+    const p=xy(c);
+    const cand=lugares.map(x=>({x, d:Math.sqrt(d2(p,x.p))*1000})).filter(o=>o.d<=120).sort((a,b)=>a.d-b.d);
+    const conNombre=cand.find(o=>nombreCoincide(c, (o.x.t.name||'')+' '+(o.x.t.brand||'')));
+    // sin coincidencia de nombre solo se acepta un comercio pegado al pin y que sea el único cerca
+    const elegido = conNombre || (cand.length && cand[0].d<=25 && (cand.length===1 || cand[1].d>60) && (cand[0].x.t.shop||cand[0].x.t.craft) ? cand[0] : null);
+    if(!elegido) return;
+    const rangos=rangosOSM(elegido.x.t.opening_hours); if(!rangos) return;
+    S.horOSM[c.id]={rangos, nombre:elegido.x.t.name||'', dist:Math.round(elegido.d), oh:elegido.x.t.opening_hours, nombreOk:!!conNombre};
+    n++;
+  });
+  save();
+  return {buscados:cl.length, encontrados:n};
 }
 function openSugerencias(){
   const lista=sugerenciasHorario();
-  let h=`<h2>Horarios sugeridos</h2><p class="sub">Los detecté en los comentarios y resúmenes de visita. Revisalos antes de aceptar.</p>`;
+  const sinHor=S.clients.filter(c=>active(c) && located(c) && !c.horario).length;
+  const seguros=lista.filter(s=>!s.dudoso);
+  let h=`<h2>Horarios sugeridos</h2><p class="sub">Salen de los comentarios, de los resúmenes de visita y de OpenStreetMap. Revisalos antes de aceptar.</p>
+  ${sinHor?`<div class="row" style="margin-top:0"><button class="btn dark" id="sgOSM">Buscar horarios en OpenStreetMap (${sinHor} sin horario)</button></div>`:''}`;
   if(!lista.length) h+=`<div class="empty"><p>No hay sugerencias pendientes.</p></div>`;
   else {
-    h+=`<div class="row" style="margin-top:0"><button class="btn go" id="sgAll">Aceptar todos (${lista.length})</button></div><ul class="list">`;
-    h+=lista.map(s=>`<li style="--c:${zoneColor(s.c.zona)}"><span class="txt"><b><span class="code">${esc(codeOf(s.c))}</span>${esc(s.c.nombre)}</b><small>${esc(fmtHorario(s.rangos))}</small><small>«${esc(s.fuente.length>90?s.fuente.slice(0,90)+'…':s.fuente)}»</small></span>
+    h+=`<div class="row"><button class="btn go" id="sgAll">Aceptar ${seguros.length<lista.length?'los seguros':'todos'} (${seguros.length})</button></div>
+    ${seguros.length<lista.length?`<p class="hint">Los marcados con ⚠ son comercios pegados al pin pero con otro nombre: aceptalos de a uno si son tu cliente.</p>`:''}<ul class="list">`;
+    h+=lista.map(s=>`<li style="--c:${zoneColor(s.c.zona)}"><span class="txt"><b><span class="code">${esc(codeOf(s.c))}</span>${s.dudoso?'⚠ ':''}${esc(s.c.nombre)}</b><small>${esc(fmtHorario(s.rangos))}</small><small>«${esc(s.fuente.length>110?s.fuente.slice(0,110)+'…':s.fuente)}»</small></span>
       <button class="btn small" data-ok="${s.c.id}">Aceptar</button><button class="btn small" data-ed="${s.c.id}">Editar</button><button class="btn small" data-no="${s.c.id}">Descartar</button></li>`).join('')+'</ul>';
   }
   openSheet(h);
   const aceptar=s=>{ s.c.horario=fmtHorario(s.rangos); queueCampos(s.c,{horario:s.c.horario}, true); };
-  const all=document.getElementById('sgAll'); if(all) all.onclick=()=>{ lista.forEach(aceptar); save(); scheduleFlush(); toast(lista.length+' horarios guardados'); openSugerencias(); };
+  const all=document.getElementById('sgAll'); if(all) all.onclick=()=>{ seguros.forEach(aceptar); save(); scheduleFlush(); toast(seguros.length+' horarios guardados'); openSugerencias(); };
+  const bo=document.getElementById('sgOSM'); if(bo) bo.onclick=async()=>{
+    bo.disabled=true; bo.textContent='Buscando en OpenStreetMap… (puede tardar un minuto)';
+    try{ const r=await buscarHorariosOSM(); openSugerencias(); toast(`Se encontró el horario de ${r.encontrados} de ${r.buscados} clientes`, 5000); }
+    catch(e){ bo.disabled=false; bo.textContent='Reintentar búsqueda en OpenStreetMap'; toast('No se pudo consultar OpenStreetMap. Probá de nuevo en un rato.', 5000); }
+  };
   sheetBody.onclick=e=>{
     const ok=e.target.closest('[data-ok]'), ed=e.target.closest('[data-ed]'), no=e.target.closest('[data-no]');
     if(ok){ const s=lista.find(x=>x.c.id===ok.dataset.ok); aceptar(s); save(); scheduleFlush(); toast('Horario guardado'); openSugerencias(); }
