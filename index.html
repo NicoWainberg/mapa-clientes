@@ -746,6 +746,19 @@ button{font:inherit;color:inherit;cursor:pointer}
 .lbl b{font-family:var(--cond);font-size:15px;margin-right:4px}
 .codebig{display:inline-block;font-family:var(--cond);font-size:22px;font-weight:700;background:var(--c);color:#fff;border-radius:8px;padding:2px 10px;margin-top:6px}
 .code{font-family:var(--cond);font-weight:700;margin-right:6px}
+.prod-per{font-weight:500;color:var(--ink-2);font-size:12px;margin-left:4px}
+ul.prod{list-style:none;margin:6px 0 4px;padding:0}
+ul.prod li{display:flex;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line);font-size:15px}
+ul.prod li:last-child{border-bottom:0}
+ul.prod .pn{width:22px;color:var(--ink-2);flex:0 0 auto}
+ul.prod .pd{flex:1 1 auto;min-width:0}
+ul.prod .pq{flex:0 0 auto;margin-left:10px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+ul.prod li.viejo .pd, ul.prod li.viejo .pq{color:#c0392b}
+.prod-sug{margin:6px 0 14px;padding-top:8px;border-top:1px solid var(--line)}
+.prod-sug small{color:var(--ink-2);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.prod-sug ul{list-style:none;margin:4px 0 0;padding:0}
+.prod-sug li{color:var(--ink-2);font-size:14px;padding:3px 0}
+.prod-sug li span{display:inline-block;width:22px;font-weight:700}
 .lastv{background:var(--bg);border-left:4px solid #2f6fd6;padding:10px 12px;border-radius:6px;white-space:pre-wrap;font-size:15px;line-height:1.45;margin:6px 0}
 .pend{font-size:13px;color:var(--warn);font-weight:600;margin-top:6px}
 select{width:100%;font:inherit;font-size:16px;padding:11px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
@@ -1402,7 +1415,7 @@ function openClient(id, tab){
   const extras = Object.entries(c.extra||{}).filter(([k,val])=>String(val).trim());
   let h = `<span class="codebig" style="--c:${c.baja?'#9aa7ab':zoneColor(c.zona)}">${esc(codeOf(c))}</span>
   <h2>${esc(c.nombre||'Sin nombre')}</h2>${c.razon && norm(c.razon)!==norm(c.nombre)?`<p class="razon">${esc(c.razon)}</p>`:''}
-  <span class="zonetag" style="--c:${zoneColor(c.zona)}"><i></i>${c.baja?'No existe más':c.zona!=null?'Zona '+(c.zona+1):'Sin zona'}${c.rubro?' &nbsp;|&nbsp; '+esc(c.rubro):''}</span>
+  <span class="zonetag" style="--c:${zoneColor(c.zona)}"><i></i>${c.baja?'No existe más':c.zona!=null?'Zona '+(c.zona+1):'Sin zona'}</span>
   <p class="sub">${esc(c.direccion)}${c.localidad?', '+esc(c.localidad):''}${c.partido&&norm(c.partido)!==norm(c.localidad)?' ('+esc(c.partido)+')':''}${UI.me&&located(c)?` <b>(a ${kmTo(c)})</b>`:''}</p>${c.geoDudosa?`<p class="pend">Ubicación a revisar: ${esc(c.geoNota||'')}</p>`:''}`;
   const cab = h; h = '';
   if(v) h += `<div class="done-note">Visitado el ${new Date(c.visitFecha).toLocaleDateString('es-AR',{day:'numeric',month:'numeric'})}</div>`;
@@ -1416,6 +1429,7 @@ function openClient(id, tab){
   const est = estadoAhora(c);
   const rows = [['Contacto',c.contacto],['Teléfono',c.telefono],['Horario',horarioTexto(c)],...(est?[['Ahora',est.txt]]:[]),...extras];
   if(rows.some(r=>String(r[1]||'').trim())) h += `<dl>${rows.filter(r=>String(r[1]||'').trim()).map(([k,val])=>`<dt>${esc(k)}</dt><dd>${esc(val)}</dd>`).join('')}</dl>`;
+  h += productosHtml(c);
   h += `<h3>Última visita</h3>${c.ultimaVisita?`<div class="lastv">${esc(c.ultimaVisita)}</div>`:'<p class="sub">Sin visitas registradas.</p>'}`;
   const pendItem = (S.outbox||[]).find(o=>o.clientId===c.id);
   if(pendItem) h += `<div class="pend">${pendItem.error?'No se pudo enviar: '+esc(pendItem.error):'Pendiente de enviar a la planilla'}</div>`;
@@ -1697,6 +1711,20 @@ function terminarRevision(msg){
   const bar=document.getElementById('revBar'); bar.hidden=true; bar.innerHTML='';
   document.body.classList.remove('revisando'); UI.revisando=null; UI.selected=null; render();
   if(msg) toast(msg);
+}
+
+/* ---- Productos que compra el cliente (de las facturas del sistema) ---- */
+function productosHtml(c){
+  const p=(S.productos||{})[String(c.codigo||'').trim()];
+  if(!p || !(p.t||[]).length) return '';
+  const hoyMs=Date.now(), lim=60*864e5;
+  const fmtCant=q=>Number(q).toLocaleString('es-AR',{maximumFractionDigits:2})+' u';
+  let h=`<h3>Compró anteriormente <small class="prod-per">últimos 12 meses</small></h3><ul class="prod">`;
+  h+=p.t.map((x,i)=>{ const f=new Date(x[2]+'T12:00:00'), viejo=hoyMs-f.getTime()>lim;
+    return `<li class="${viejo?'viejo':''}" title="Última compra: ${f.toLocaleDateString('es-AR')}"><span class="pn">${i+1}.</span><span class="pd">${esc(x[0])}</span><span class="pq">${fmtCant(x[1])}</span></li>`; }).join('');
+  h+='</ul>';
+  if((p.s||[]).length) h+=`<div class="prod-sug"><small>Podría interesarle</small><ul>${p.s.map(x=>`<li><span>+</span>${esc(x)}</li>`).join('')}</ul></div>`;
+  return h;
 }
 
 const ICO={
@@ -2047,6 +2075,7 @@ async function leerDesdeScript(silent){
     const visitas = j.visitas||[];
     const pendR = (S.outbox||[]).some(o=>o.tipo==='reinicio');
     if(!pendR && j.reinicio!=null) S.reinicio = Math.max(Number(j.reinicio)||0, 0);
+    if(j.productos){ S.productos=j.productos; S.prodAct=Number(j.prodAct)||0; }
     if(j.deudas){
       S.deudas=j.deudas; S.deudasAct=Number(j.deudasAct)||0;
       const cb={}; (j.cobradas||[]).forEach(x=>{ cb[norm(String(x.codigo).trim())+'|'+x.numero]=x.marcada; });
