@@ -647,7 +647,8 @@ function renglonesFactura(bytes) {
   while ((m = re.exec(s))) {
     const ini = m.index + m[0].length, fin = s.indexOf('endstream', ini);
     if (fin < 0) break;
-    if (!/FlateDecode/.test(s.slice(Math.max(0, m.index - 250), m.index))) continue;
+    const dic = s.slice(Math.max(0, m.index - 250), m.index);
+    if (!/FlateDecode/.test(dic) || /\/Image/.test(dic)) continue;
     try { const d = inflarZlib(bytes.slice(ini, fin)); for (let i = 0; i < d.length; i += 8192) txt += String.fromCharCode.apply(null, d.slice(i, i + 8192)); txt += '\n'; } catch (e) {}
     re.lastIndex = fin;
   }
@@ -656,7 +657,12 @@ function renglonesFactura(bytes) {
   els.sort((a, b) => a.y - b.y);
   const filas = [];
   els.forEach(e => { const l = filas[filas.length - 1]; if (l && e.y - l.y0 <= 12) l.r.push(e); else filas.push({ y0: e.y, r: [e] }); });
+  // Importes impresos al pie (Sub-Total y Sub-Total con bonificación), para controlar los renglones
+  const pie = t => { const et = els.find(e => e.s.replace(/\s/g, '') === t); if (!et) return 0;
+    const v = els.filter(e => /^\$/.test(e.s) && e.y < et.y && e.y > et.y - 500 && Math.abs(e.x - et.x) < 700).sort((a, b) => Math.abs(a.x - et.x) - Math.abs(b.x - et.x))[0];
+    return v ? Number(v.s.replace(/[$\s]/g, '')) || 0 : 0; };
   const out = [];
+  out.controles = [pie('Sub-Total+Bonif.'), pie('Sub-Total')].filter(Boolean);
   filas.forEach(f => {
     const g = (a, b) => { const e = f.r.find(e => e.x >= a && e.x < b); return e ? e.s : ''; };
     const cod = g(6500, 7900), cant = g(400, 1400), desc = g(1500, 6000), sub = g(10300, 11400);
@@ -665,15 +671,20 @@ function renglonesFactura(bytes) {
   return out;
 }
 
-// Control contra el total de la factura: si los renglones no cierran con el importe (con IVA y percepciones),
-// se sacan renglones repetidos y, si todavía no cierra, se ajustan los importes en proporción.
-function ajustarRenglones(items, monto) {
-  if (!items.length || !monto) return items;
-  const cierra = l => { const s = l.reduce((t, i) => t + i.sub, 0); const f = monto / (s || 1); return f >= 1.14 && f <= 1.32; };
+// Control de los renglones contra el Sub-Total impreso en la factura (o, si no se encuentra, contra el
+// importe de la lista, que incluye IVA y percepciones). Si no cierran, se sacan renglones repetidos y,
+// si todavía no cierra, se ajustan los importes en proporción.
+function ajustarRenglones(items, controles, monto) {
+  if (!items.length) return items;
+  controles = controles || [];
+  let objetivo = controles[0] || 0, cierra;
+  if (objetivo) cierra = l => { const s = l.reduce((t, i) => t + i.sub, 0); return controles.some(c => Math.abs(s - c) <= Math.max(1, c * 0.01)); };
+  else if (monto && monto < 999999) { objetivo = monto / 1.21; cierra = l => { const f = monto / (l.reduce((t, i) => t + i.sub, 0) || 1); return f >= 1.14 && f <= 1.32; }; }
+  else return items; // sin forma de controlar
   if (cierra(items)) return items;
   const vistos = {}, unicos = items.filter(i => { const k = i.cod + '|' + i.cant + '|' + i.sub; if (vistos[k]) return false; vistos[k] = 1; return true; });
   if (cierra(unicos)) return unicos;
-  const s = unicos.reduce((t, i) => t + i.sub, 0) || 1, f = (monto / 1.21) / s;
+  const s = unicos.reduce((t, i) => t + i.sub, 0) || 1, f = objetivo / s;
   return unicos.map(i => ({ cod: i.cod, desc: i.desc, cant: i.cant, sub: Math.round(i.sub * f * 100) / 100 }));
 }
 
@@ -738,7 +749,7 @@ function actualizarProductos(ss, limiteMs) {
     const filas = [];
     tanda.forEach((x, k) => {
       if (r[k].getResponseCode() !== 200) return;
-      let items = []; try { items = ajustarRenglones(renglonesFactura(r[k].getContent()), x.monto); } catch (e) {}
+      let items = []; try { const rr = renglonesFactura(r[k].getContent()); items = ajustarRenglones(rr, rr.controles, x.monto); } catch (e) {}
       if (!items.length) filas.push([x.cod, fmtFecha(x.fecha), x.id, x.num, '', '', 0, 0]); // marca: ya leída, sin renglones
       items.forEach(it => filas.push([x.cod, fmtFecha(x.fecha), x.id, x.num, it.cod, it.desc, it.cant, it.sub]));
       leidas++;
@@ -860,7 +871,8 @@ function leerResumenProductos(ss) {
 function inflarZlib(bytes) {
   const src = bytes, out = [];
   let pos = 2, bit = 0, buf = 0; // se saltean los 2 bytes de cabecera zlib
-  function bits(n) { while (bit < n) { buf |= (src[pos++] & 255) << bit; bit += 8; } const v = buf & ((1 << n) - 1); buf >>>= n; bit -= n; return v; }
+  const lim = src.length + 4;
+  function bits(n) { while (bit < n) { if (pos >= lim) throw new Error('Datos incompletos'); buf |= (src[pos++] & 255) << bit; bit += 8; } const v = buf & ((1 << n) - 1); buf >>>= n; bit -= n; return v; }
   function arbol(lens, n) {
     const cnt = new Array(16).fill(0), offs = new Array(16).fill(0), sym = new Array(n);
     for (let i = 0; i < n; i++) cnt[lens[i]]++;
@@ -901,6 +913,7 @@ function inflarZlib(bytes) {
       const s = dec(lt);
       if (s < 256) out.push(s);
       else if (s === 256) break;
+      else if (out.length > 4000000) throw new Error('Demasiado grande');
       else { const l = LB[s - 257] + bits(LE[s - 257]), ds = dec(dt), d = DB[ds] + bits(DE[ds]); const st = out.length - d; for (let i = 0; i < l; i++) out.push(out[st + i]); }
     }
   }
