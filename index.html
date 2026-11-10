@@ -855,7 +855,20 @@ body.vista-cob #cobView{display:block}
 .leyenda span{display:flex;align-items:center;gap:6px}
 .leyenda i{width:10px;height:10px;border-radius:3px;display:inline-block}
 .leyenda b{font-weight:700}
-.cob-ctrl{margin:14px 0 10px}
+.cob-ctrl{margin:14px 0 6px;display:flex;gap:8px;align-items:stretch}
+.cob-ctrl select{flex:1 1 55%;min-width:0;min-height:44px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);font:inherit;font-weight:600;font-size:15px;padding:0 10px;color:var(--ink)}
+.cob-ctrl .seg{flex:1 1 45%}
+.cob-nota{font-size:12px;color:var(--ink-2);margin:0 0 10px}
+.cob-total{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px}
+.cob-total>small{flex-basis:100%}
+.cob-total>b{margin:0 !important}
+.cob-total>span{font-size:14px;opacity:.85}
+.sc-sub .t-venc{color:var(--venc);font-weight:700;background:#fdecea;border-radius:6px;padding:1px 6px}
+.sc-sub .t-pv{color:#8a5300;font-weight:700;background:#fff4d6;border-radius:6px;padding:1px 6px}
+.sc-sub .t-ok{color:var(--ink-2)}
+.score li{border-left:4px solid var(--line);padding-left:10px;margin-left:-14px}
+.score li.venc{border-left-color:var(--venc)}
+.score li.pv{border-left-color:#e0a100}
 .seg{display:flex;border:1.5px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card)}
 .seg button{flex:1;min-height:42px;border:0;background:none;font-weight:600;font-size:14px;color:var(--ink-2)}
 .seg button+button{border-left:1.5px solid var(--line)}
@@ -955,7 +968,7 @@ body.revisando #fabs, body.revisando #chips{display:none}
     <button class="ibtn" id="btnSync" aria-label="Actualizar desde la planilla" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><polyline points="20 4 20 9 15 9"/></svg></button>
     <button class="ibtn" id="btnMenu" aria-label="Ajustes"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   </div>
-  <div id="chips" role="toolbar" aria-label="Zonas"></div>
+  <div id="chips" role="toolbar" aria-label="Días"></div>
 </div>
 
 <div id="cobView" aria-label="Cobranzas"></div>
@@ -1182,26 +1195,26 @@ function zonaDelDia(excluir){
   if(S.hoyZona && S.hoyZona.dia===diaKey()) return S.hoyZona.z;
   return zonaMayoria(visitadosDia(inicioDia()).filter(c=>c!==excluir));
 }
-// Antes de marcar una visita: si el cliente es de otra zona, pregunta si se suma a la zona del día
+// Antes de marcar una visita: si el cliente es de otro día, pregunta si se suma a la zona del día
 function conZonaDelDia(c, seguir){
   if(UI.avisoZona) mudarSobrantes(true);
   if(isVisited(c) || c.zona==null){ seguir(); return; }
   const zd=zonaDelDia(c);
   if(zd==null || zd===c.zona){ seguir(); return; }
   const zc=c.zona;
-  openSheet(`<h2>¿Agregar a la Zona ${zd+1}?</h2>
-    <p class="sub"><b>${esc(codeOf(c))} ${esc(c.nombre||'')}</b> es de la Zona ${zc+1}, y hoy venís haciendo la Zona ${zd+1}. Si lo agregás, queda en la Zona ${zd+1} para los próximos meses.</p>
-    <div class="row"><button class="btn go" id="zdSi">Sí, pasarlo a la Zona ${zd+1}</button><button class="btn" id="zdNo">No, dejarlo en la Zona ${zc+1}</button></div>
-    <div class="row" style="justify-content:center"><button class="btn small linkish" id="zdCambio">Hoy hago la Zona ${zc+1}</button></div>`);
+  openSheet(`<h2>¿Agregar al Día ${zd+1}?</h2>
+    <p class="sub"><b>${esc(codeOf(c))} ${esc(c.nombre||'')}</b> es del Día ${zc+1}, y hoy venís haciendo el Día ${zd+1}. Si lo agregás, queda en el Día ${zd+1} para los próximos meses.</p>
+    <div class="row"><button class="btn go" id="zdSi">Sí, pasarlo al Día ${zd+1}</button><button class="btn" id="zdNo">No, dejarlo en el Día ${zc+1}</button></div>
+    <div class="row" style="justify-content:center"><button class="btn small linkish" id="zdCambio">Hoy hago el Día ${zc+1}</button></div>`);
   sheetBody.onclick=null;
-  document.getElementById('zdSi').onclick=()=>{ moverDeZona(c, zd); save(); scheduleFlush(); toast(`Agregado a la Zona ${zd+1}`); seguir(); };
+  document.getElementById('zdSi').onclick=()=>{ moverDeZona(c, zd); save(); scheduleFlush(); toast(`Agregado al Día ${zd+1}`); seguir(); };
   document.getElementById('zdNo').onclick=()=>seguir();
   document.getElementById('zdCambio').onclick=()=>{
     S.hoyZona={dia:diaKey(), z:zc}; save();
     const otros=visitadosDia(inicioDia()).filter(o=>o!==c && o.zona!==zc);
     if(!otros.length){ seguir(); return; }
-    openSheet(`<h2>Hoy hacés la Zona ${zc+1}</h2>
-      <p class="sub">Hoy ya visitaste ${otros.length===1?'un cliente':otros.length+' clientes'} de otra zona: ${otros.map(o=>'<b>'+esc(codeOf(o)+' '+(o.nombre||''))+'</b> (Zona '+(o.zona+1)+')').join(', ')}. ¿${otros.length===1?'Lo':'Los'} pasamos a la Zona ${zc+1}?</p>
+    openSheet(`<h2>Hoy hacés el Día ${zc+1}</h2>
+      <p class="sub">Hoy ya visitaste ${otros.length===1?'un cliente':otros.length+' clientes'} de otro día: ${otros.map(o=>'<b>'+esc(codeOf(o)+' '+(o.nombre||''))+'</b> (Día '+(o.zona+1)+')').join(', ')}. ¿${otros.length===1?'Lo':'Los'} pasamos al Día ${zc+1}?</p>
       <div class="row"><button class="btn go" id="zdSi2">Sí, pasar${otros.length===1?'lo':'los'}</button><button class="btn" id="zdNo2">No</button></div>`);
     sheetBody.onclick=null;
     document.getElementById('zdSi2').onclick=()=>{ otros.forEach(o=>moverDeZona(o, zc)); save(); scheduleFlush(); seguir(); };
@@ -1223,11 +1236,11 @@ function revisarDiaAnterior(){
   UI.avisoZona={dia, z:zd, ids:sob.map(c=>c.id)};
   const el=document.getElementById('avisoZona');
   const cuando = (hoyIni-inicioDia(new Date(ult)))===86400000 ? 'Ayer' : 'El '+new Date(ult).toLocaleDateString('es-AR',{weekday:'long'});
-  el.innerHTML=`<p>${cuando} te ${sob.length===1?'quedó 1 cliente':'quedaron '+sob.length+' clientes'} sin visitar de la Zona ${zd+1}: ${sob.slice(0,4).map(c=>esc(c.nombre||codeOf(c))).join(', ')}${sob.length>4?' y '+(sob.length-4)+' más':''}.</p>
-    <div class="az-acc"><button class="btn go" id="azMudar">Mudarlos a la zona más cercana</button><button class="btn" id="azDejar">Dejarlos en la Zona ${zd+1}</button></div>`;
+  el.innerHTML=`<p>${cuando} te ${sob.length===1?'quedó 1 cliente':'quedaron '+sob.length+' clientes'} sin visitar del Día ${zd+1}: ${sob.slice(0,4).map(c=>esc(c.nombre||codeOf(c))).join(', ')}${sob.length>4?' y '+(sob.length-4)+' más':''}.</p>
+    <div class="az-acc"><button class="btn go" id="azMudar">Mudarlos a la zona más cercana</button><button class="btn" id="azDejar">Dejarlos en el Día ${zd+1}</button></div>`;
   el.hidden=false;
   document.getElementById('azMudar').onclick=()=>mudarSobrantes(false);
-  document.getElementById('azDejar').onclick=()=>{ S.zonaRevisada=dia; save(); UI.avisoZona=null; el.hidden=true; toast(`Quedan en la Zona ${zd+1}`); };
+  document.getElementById('azDejar').onclick=()=>{ S.zonaRevisada=dia; save(); UI.avisoZona=null; el.hidden=true; toast(`Quedan en el Día ${zd+1}`); };
 }
 function mudarSobrantes(auto){
   const a=UI.avisoZona; if(!a) return;
@@ -1236,8 +1249,8 @@ function mudarSobrantes(auto){
   const MAX=S.maxZona||12, msg=[], avisos=[];
   a.ids.forEach(id=>{ const c=S.clients.find(x=>x.id===id); if(!c || c.zona!==a.z || isVisited(c)) return;
     const z=zonasCercanas(c, a.z, MAX)[0]; if(z==null) return;
-    moverDeZona(c, z); msg.push(`${c.nombre||codeOf(c)} → Zona ${z+1}`);
-    if(miembrosZona(z).filter(o=>o!==c).every(isVisited)) avisos.push(`${c.nombre||codeOf(c)} quedó pendiente este mes en la Zona ${z+1}, que ya hiciste`);
+    moverDeZona(c, z); msg.push(`${c.nombre||codeOf(c)} → Día ${z+1}`);
+    if(miembrosZona(z).filter(o=>o!==c).every(isVisited)) avisos.push(`${c.nombre||codeOf(c)} quedó pendiente este mes en el Día ${z+1}, que ya hiciste`);
   });
   compactarZonasChicas(true);
   save(); scheduleFlush(); render();
@@ -1253,7 +1266,7 @@ function compactarZonasChicas(silencio){
       if(dest==null || dest!==cerca) return; // la vecina más cercana ya está llena: se deja el grupo
       plan.push([c,dest]); extra[dest]=(extra[dest]||0)+1; }
     plan.forEach(([c,dest])=>moverDeZona(c,dest)); total+=plan.length;
-    if(plan.length && !silencio) toast(`La Zona ${z+1} se repartió entre sus vecinas`);
+    if(plan.length && !silencio) toast(`La Día ${z+1} se repartió entre sus vecinas`);
   });
   return total;
 }
@@ -1373,10 +1386,10 @@ function renderTop(){
   renderDay(total>0);
   const k = zoneCount(); const chips = document.getElementById('chips');
   if(!k){ chips.innerHTML=''; return; }
-  let h = `<button class="chip" aria-pressed="${UI.zone==='all'}" style="--c:#14313a" data-z="all">Todas</button>`;
+  let h = `<button class="chip" aria-pressed="${UI.zone==='all'}" style="--c:#14313a" data-z="all">Todos</button>`;
   for(let z=0; z<k; z++){
     const pend = S.clients.filter(c=>active(c) && c.zona===z && !isVisited(c)).length;
-    h += `<button class="chip ${pend?'':'done'}" aria-pressed="${UI.zone===z}" style="--c:${zoneColor(z)}" data-z="${z}"><span class="dot"></span>Zona ${z+1} <span class="n">${pend||'✓'}</span></button>`;
+    h += `<button class="chip ${pend?'':'done'}" aria-pressed="${UI.zone===z}" style="--c:${zoneColor(z)}" data-z="${z}"><span class="dot"></span>Día ${z+1} <span class="n">${pend||'✓'}</span></button>`;
   }
   chips.innerHTML = h;
 }
@@ -1415,7 +1428,7 @@ function openClient(id, tab){
   const extras = Object.entries(c.extra||{}).filter(([k,val])=>String(val).trim());
   let h = `<span class="codebig" style="--c:${c.baja?'#9aa7ab':zoneColor(c.zona)}">${esc(codeOf(c))}</span>
   <h2>${esc(c.nombre||'Sin nombre')}</h2>${c.razon && norm(c.razon)!==norm(c.nombre)?`<p class="razon">${esc(c.razon)}</p>`:''}
-  <span class="zonetag" style="--c:${zoneColor(c.zona)}"><i></i>${c.baja?'No existe más':c.zona!=null?'Zona '+(c.zona+1):'Sin zona'}</span>
+  <span class="zonetag" style="--c:${zoneColor(c.zona)}"><i></i>${c.baja?'No existe más':c.zona!=null?'Día '+(c.zona+1):'Sin día'}</span>
   <p class="sub">${esc(c.direccion)}${c.localidad?', '+esc(c.localidad):''}${c.partido&&norm(c.partido)!==norm(c.localidad)?' ('+esc(c.partido)+')':''}${UI.me&&located(c)?` <b>(a ${kmTo(c)})</b>`:''}</p>${c.geoDudosa?`<p class="pend">Ubicación a revisar: ${esc(c.geoNota||'')}</p>`:''}`;
   const cab = h; h = '';
   if(v) h += `<div class="done-note">Visitado el ${new Date(c.visitFecha).toLocaleDateString('es-AR',{day:'numeric',month:'numeric'})}</div>`;
@@ -1469,17 +1482,17 @@ function openClient(id, tab){
 }
 function openZonePicker(c){
   const k = zoneCount();
-  let h = `<h2>Mover a zona</h2><p class="sub"><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre||'')} está en ${c.zona!=null?'la Zona '+(c.zona+1):'ninguna zona'}.</p><ul class="list">`;
+  let h = `<h2>Mover a otro día</h2><p class="sub"><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre||'')} está en ${c.zona!=null?'el Día '+(c.zona+1):'ningún día'}.</p><ul class="list">`;
   for(let z=0; z<k; z++){
     const cant = S.clients.filter(x=>active(x)&&x.zona===z).length;
-    h += `<li style="--c:${zoneColor(z)}" data-to="${z}"><span class="num">${z+1}</span><span class="txt"><b>Zona ${z+1}${z===c.zona?' (actual)':''}</b><small>${cant} clientes</small></span></li>`;
+    h += `<li style="--c:${zoneColor(z)}" data-to="${z}"><span class="num">${z+1}</span><span class="txt"><b>Día ${z+1}${z===c.zona?' (actual)':''}</b><small>${cant} clientes</small></span></li>`;
   }
-  h += `<li style="--c:#56707a" data-to="${k}"><span class="num">+</span><span class="txt"><b>Zona nueva</b><small>Crea la Zona ${k+1}</small></span></li></ul>`;
+  h += `<li style="--c:#56707a" data-to="${k}"><span class="num">+</span><span class="txt"><b>Día nuevo</b><small>Crea el Día ${k+1}</small></span></li></ul>`;
   openSheet(h);
   sheetBody.onclick = e=>{
     const li=e.target.closest('[data-to]'); if(!li) return;
     const z=+li.dataset.to; if(z===c.zona){ openClient(c.id); return; }
-    c.zona=z; c.zonaManual=true; queueCampos(c, zonaCampo(c)); save(); refreshRouteStart(); render(); openClient(c.id); toast(`Movido a la Zona ${z+1}`);
+    c.zona=z; c.zonaManual=true; queueCampos(c, zonaCampo(c)); save(); refreshRouteStart(); render(); openClient(c.id); toast(`Movido al Día ${z+1}`);
   };
 }
 function horaAhora(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
@@ -1514,30 +1527,30 @@ function unmarkVisited(c){
 }
 function maybeZoneDone(z){
   if(z==null) return;
-  if(!S.clients.some(c=>active(c) && c.zona===z && !isVisited(c))) toast(`Zona ${z+1} completa`);
+  if(!S.clients.some(c=>active(c) && c.zona===z && !isVisited(c))) toast(`Día ${z+1} completo`);
 }
 
 function openList(){
   let h='';
   if(UI.zone==='all'){
     const k=zoneCount();
-    h = `<h2>Zonas</h2><p class="sub">Elegí la zona del día. Cada una tiene entre ${S.minZona||8} y ${S.maxZona||12} clientes.</p><ul class="list">`;
+    h = `<h2>Días</h2><p class="sub">Elegí el día de recorrido. Cada uno tiene entre ${S.minZona||8} y ${S.maxZona||12} clientes.</p><ul class="list">`;
     for(let z=0;z<k;z++){
       const all = S.clients.filter(c=>active(c)&&c.zona===z), pend = all.filter(c=>!isVisited(c)).length;
       if(!all.length) continue;
-      h += `<li style="--c:${zoneColor(z)}" data-z="${z}"><span class="num">${z+1}</span><span class="txt"><b>Zona ${z+1}</b><small>${pend ? pend+' pendientes de '+all.length : 'Completa'}</small></span></li>`;
+      h += `<li style="--c:${zoneColor(z)}" data-z="${z}"><span class="num">${z+1}</span><span class="txt"><b>Día ${z+1}</b><small>${pend ? pend+' pendientes de '+all.length : 'Completa'}</small></span></li>`;
     }
     h += '</ul>';
     if(!k) h = emptyHtml();
   } else {
     const route = currentRoute(), z = UI.zone;
     const done = S.clients.filter(c=>active(c) && c.zona===z && isVisited(c));
-    h = `<h2>Zona ${z+1}</h2><p class="sub">${route.length} pendientes, ${S.plan && S.plan.zona===z && S.plan.dia===diaKey() ? 'en el orden de la ruta planificada' : 'en orden sugerido'}.</p>`;
+    h = `<h2>Día ${z+1}</h2><p class="sub">${route.length} pendientes, ${S.plan && S.plan.zona===z && S.plan.dia===diaKey() ? 'en el orden de la ruta planificada' : 'en orden sugerido'}.</p>`;
     if(route.length){
       h += `<ul class="list">${route.map((c,i)=>`<li style="--c:${zoneColor(z)}" data-id="${c.id}"><span class="num">${i+1}</span><span class="txt"><b><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre||'Sin nombre')}</b><small>${esc(c.direccion)}${c.horario?' | '+esc(c.horario):''}</small></span><button class="tick" data-tick="${c.id}" aria-label="Marcar visitado">✓</button></li>`).join('')}</ul>`;
       const planHoy = S.plan && S.plan.zona===z && S.plan.dia===diaKey();
       h += `<div class="row"><button class="btn go" id="btnPlan">Planificar ruta</button>${planHoy&&UI.plan&&UI.plan.par.z===z?'<button class="btn" id="btnVerPlan">Ver recorrido de hoy</button>':''}</div>`;
-    } else h += `<div class="empty"><p>No quedan clientes pendientes en esta zona este mes.</p></div>`;
+    } else h += `<div class="empty"><p>No quedan clientes pendientes en este día este mes.</p></div>`;
     if(done.length) h += `<h3>Visitados este mes (${done.length})</h3><ul class="list">${done.map(c=>`<li style="--c:#9aa7ab" data-id="${c.id}"><span class="num">✓</span><span class="txt"><b><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre)}</b><small>${esc(c.direccion)}</small></span></li>`).join('')}</ul>`;
   }
   openSheet(h);
@@ -1586,8 +1599,9 @@ function openMenu(){
     ${bajas?`<button data-m="bajas">Clientes ocultos <small>${bajas}</small></button>`:''}
     ${watchId!=null?'<button data-m="stoptrack">Dejar de seguir mi ubicación</button>':''}
     <button data-m="visited">${S.showVisited?'Ocultar':'Mostrar'} visitados</button>
+    <button data-m="cobmin">Cobranzas: deuda mínima a mostrar <small>${plata(minimoCob())}</small></button>
     <button data-m="ruta">Ruta y horarios <small>${cfgRuta().casa?'casa cargada':'cargar mi casa'}</small></button>
-    <button data-m="zones">Recalcular zonas <small>${S.minZona||8} a ${S.maxZona||12} por zona</small></button>
+    <button data-m="zones">Recalcular días <small>${S.minZona||8} a ${S.maxZona||12} clientes por día</small></button>
     <button data-m="reset">Reiniciar visitas del mes</button>
     <button data-m="export">Descargar respaldo</button>
     <button data-m="restore">Restaurar respaldo</button>
@@ -1609,6 +1623,13 @@ function openMenu(){
     if(m==='visited'){ S.showVisited=!S.showVisited; save(); render(); openMenu(); }
     if(m==='zones') openZoneForm();
     if(m==='ruta') openAjustesRuta();
+    if(m==='cobmin'){
+      openSheet(`<h2>Deuda mínima a mostrar</h2><p class="sub">En Cobranzas no aparecen los clientes que deben menos que este monto.</p>
+        <label for="cmin">Monto mínimo ($)</label><input id="cmin" type="number" inputmode="numeric" min="0" step="1000" value="${minimoCob()}">
+        <div class="row"><button class="btn go" id="cminOk">Guardar</button><button class="btn" id="cminNo">Cancelar</button></div>`);
+      document.getElementById('cminOk').onclick=()=>{ const v=parseInt(document.getElementById('cmin').value,10); S.cobMin=isNaN(v)||v<0?0:v; save(); toast('Guardado'); renderCob(); openMenu(); };
+      document.getElementById('cminNo').onclick=()=>openMenu();
+    }
     if(m==='reset' && confirm('¿Volver a mostrar todos los clientes como pendientes? El historial de visitas no se borra.')){
       S.reinicio = Date.now();
       S.outbox = S.outbox||[];
@@ -1633,17 +1654,17 @@ function openBajas(){
 }
 
 function openZoneForm(){
-  openSheet(`<h2>Recalcular zonas</h2><p class="sub">Agrupa a todos los clientes por cercanía. Las visitas del mes se mantienen.</p>
-  <label for="zmin">Mínimo de clientes por zona</label><input id="zmin" type="number" min="2" max="30" value="${S.minZona||8}">
-  <label for="zmax">Máximo de clientes por zona</label><input id="zmax" type="number" min="2" max="40" value="${S.maxZona||12}">
-  <p class="hint">Los cambios manuales de zona se pierden al recalcular.</p>
+  openSheet(`<h2>Recalcular días</h2><p class="sub">Agrupa a todos los clientes por cercanía. Las visitas del mes se mantienen.</p>
+  <label for="zmin">Mínimo de clientes por día</label><input id="zmin" type="number" min="2" max="30" value="${S.minZona||8}">
+  <label for="zmax">Máximo de clientes por día</label><input id="zmax" type="number" min="2" max="40" value="${S.maxZona||12}">
+  <p class="hint">Los cambios manuales de día se pierden al recalcular.</p>
   <div class="row"><button class="btn go" id="doZones">Recalcular</button></div>`);
   sheetBody.onclick=null;
   document.getElementById('doZones').onclick=()=>{
     const mn=parseInt(document.getElementById('zmin').value,10), mx=parseInt(document.getElementById('zmax').value,10);
     if(!(mn>=2 && mx>=mn)){ toast('Revisá los valores: el máximo tiene que ser mayor o igual al mínimo'); return; }
-    S.minZona=mn; S.maxZona=mx; toast('Calculando zonas…');
-    setTimeout(()=>{ computeZones(); UI.zone='all'; render(); fitZone(); openList(); toast(`${zoneCount()} zonas armadas`); }, 60);
+    S.minZona=mn; S.maxZona=mx; toast('Calculando días…');
+    setTimeout(()=>{ computeZones(); UI.zone='all'; render(); fitZone(); openList(); toast(`${zoneCount()} días armados`); }, 60);
   };
 }
 
@@ -1877,7 +1898,7 @@ function confirmPreview(){
   save();
   endPreview();
   UI.zone='all'; render(); fitZone();
-  toast(`Cliente agendado en la Zona ${c.zona+1}`);
+  toast(`Cliente agendado en el Día ${c.zona+1}`);
   if(S.scriptUrl) flushOutbox(true); else toast('Conectá la planilla en el menú para que el cliente se cargue también ahí');
 }
 
@@ -2055,7 +2076,7 @@ function aplicarZonasExcel(){
     const z=zonasCercanas(c, null, Infinity)[0]; if(z!=null && c.zona!==z){ c.zona=z; queueCampos(c, zonaCampo(c), true); n++; } });
   S.zonasExcelV1=true; S.zonasTopeV1=true; delete S.hoyZona; S.zonaRevisada=diaKey();
   save(); scheduleFlush(); render();
-  toast(`Zonas actualizadas según la hoja de ruta: ${zoneCount()} zonas`, 5000);
+  toast(`Días actualizados según la hoja de ruta: ${zoneCount()} días`, 5000);
 }
 function tareasDeZonas(){
   if(UI.geocoding || !S.clients.some(located)) return;
@@ -2292,7 +2313,7 @@ function afterGeocode(){
   save(); UI.zone='all'; render(); fitZone();
   const fail = S.clients.filter(c=>!located(c)&&active(c)).length, dud = S.clients.filter(c=>c.geoDudosa&&active(c)).length;
   if(fail||dud) showBanner(`${fail?fail+' sin ubicar':''}${fail&&dud?' · ':''}${dud?dud+' a revisar':''}`,'Revisar',()=>{hideBanner();openFailed();});
-  else toast(`${zoneCount()} zonas armadas`);
+  else toast(`${zoneCount()} días armados`);
 }
 function checkPending(){
   const n = S.clients.filter(c=>c.geo==='pending'&&active(c)).length;
@@ -2729,10 +2750,10 @@ function optimizarRuta(clis, M, info, ini, fin, salida, visita){
 }
 function openPlan(){
   const cf=cfgRuta(), z=UI.zone, pend=pendientesZona(z);
-  if(!pend.length){ toast('No quedan clientes pendientes en esta zona'); return; }
+  if(!pend.length){ toast('No quedan clientes pendientes en este día'); return; }
   const op=Object.assign({inicio:'actual', fin: cf.casa?'casa':'ninguno'}, UI.planOp||{});
   const now=new Date(), mins=Math.max(now.getHours()*60+now.getMinutes(), jornada()[0]), hhmm=String(Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
-  openSheet(`<h2>Planificar ruta · Zona ${z+1}</h2><p class="sub">${pend.length} clientes pendientes.</p>
+  openSheet(`<h2>Planificar ruta · Día ${z+1}</h2><p class="sub">${pend.length} clientes pendientes.</p>
   <label for="pIni">Inicio</label><select id="pIni">
     <option value="actual" ${op.inicio==='actual'?'selected':''}>Mi ubicación actual</option>
     <option value="casa" ${op.inicio==='casa'?'selected':''} ${cf.casa?'':'disabled'}>Mi casa${cf.casa?'':' (sin cargar)'}</option>
@@ -2765,7 +2786,7 @@ function openPlan(){
   };
 }
 async function calcularPlan(par){
-  const pend=pendientesZona(par.z); if(!pend.length){ toast('No quedan clientes pendientes en esta zona'); openList(); return; }
+  const pend=pendientesZona(par.z); if(!pend.length){ toast('No quedan clientes pendientes en este día'); openList(); return; }
   openSheet(`<h2>Calculando recorrido…</h2><p class="sub">Consultando tiempos de manejo entre ${pend.length} clientes.</p>`); sheetBody.onclick=null;
   const P=[]; let ini=null, fin=null;
   if(par.pIni){ ini=P.length; P.push({lat:par.pIni.lat, lng:par.pIni.lng}); }
@@ -2798,7 +2819,7 @@ function zonaVecina(c){
 function mostrarPlan(){
   const pl=UI.plan; if(!pl) return; const s=pl.sim, z=pl.par.z;
   const dur=(s.fin - pl.par.salida), hs=Math.floor(dur/60), mi=Math.round(dur%60);
-  let h=`<div class="row" style="margin-top:0"><button class="btn small" id="plBack">← Zona ${z+1}</button><button class="btn small" id="plOp">Cambiar inicio o final</button></div>
+  let h=`<div class="row" style="margin-top:0"><button class="btn small" id="plBack">← Día ${z+1}</button><button class="btn small" id="plOp">Cambiar inicio o final</button></div>
   <h2>Recorrido de hoy</h2>
   <p class="sub">Salida ${fmtHM(pl.par.salida)} · ${s.llegadaFin!=null?'llegada al final '+fmtHM(s.llegadaFin):'fin estimado '+fmtHM(s.fin)} · ${Math.round(s.km)} km · ${hs}h ${mi}min</p>`;
   if(!pl.M.real) h+=`<p class="pend">No se pudo consultar el servicio de rutas: tiempos aproximados en línea recta.</p>`;
@@ -2831,9 +2852,9 @@ function mostrarPlan(){
     const mv=e.target.closest('[data-mv]');
     if(mv){
       const c=S.clients.find(x=>x.id===mv.dataset.mv), nz=zonaVecina(c);
-      if(nz==null){ toast('No hay otra zona para moverlo'); return; }
-      if(!confirm(`¿Sacar a ${codeOf(c)} ${c.nombre} de la ruta de hoy y pasarlo a la Zona ${nz+1}?`)) return;
-      c.zona=nz; c.zonaManual=true; queueCampos(c, zonaCampo(c)); save(); toast(`Pasado a la Zona ${nz+1}`);
+      if(nz==null){ toast('No hay otro día para moverlo'); return; }
+      if(!confirm(`¿Sacar a ${codeOf(c)} ${c.nombre} de la ruta de hoy y pasarlo al Día ${nz+1}?`)) return;
+      c.zona=nz; c.zonaManual=true; queueCampos(c, zonaCampo(c)); save(); toast(`Pasado al Día ${nz+1}`);
       calcularPlan(pl.par); return;
     }
     const li=e.target.closest('li[data-id]'); if(li) openClient(li.dataset.id);
@@ -2946,49 +2967,72 @@ function cambiarVista(v){
   else setTimeout(()=>map.invalidateSize(), 50);
 }
 function renderNavBadge(){
-  const n=S.clients.filter(c=>active(c)).map(deudaDe).filter(d=>d && d.alertas>0).length;
+  const min=minimoCob(); const n=S.clients.filter(c=>active(c)).map(deudaNeta).filter(d=>d && d.saldo>=min && d.saldo>0 && (d.venc>0 || d.pv>0)).length;
   const b=document.getElementById('navBadge'); if(!b) return;
   b.textContent=n; b.hidden=!n;
+}
+// Deuda real pendiente por factura: el saldo del sistema se reparte desde la factura más nueva hacia
+// la más vieja (los pagos y notas de crédito cancelan primero lo más viejo)
+function deudaNeta(c){
+  const d=deudaDe(c); if(!d) return null;
+  const abiertas=d.items.filter(x=>['vencida','porvencer','aldia'].includes(x.estado));
+  const marcadas=d.items.filter(x=>x.estado==='cobrada').reduce((a,x)=>a+x.importe,0);
+  let resto=Math.max((Number(d.saldo)||0)-marcadas,0);
+  const total=resto; let venc=0, pv=0, viejo=null, atraso=0, proxPv=null;
+  abiertas.slice().sort((a,b)=>(fechaTs(b.fecha)||0)-(fechaTs(a.fecha)||0)).forEach(x=>{
+    const p=Math.min(x.importe,resto); resto-=p; if(p<=0) return;
+    if(x.estado==='vencida'){ venc+=p; atraso=Math.max(atraso,-x.restan); }
+    if(x.estado==='porvencer'){ pv+=p; proxPv=proxPv==null?x.restan:Math.min(proxPv,x.restan); }
+    if(viejo==null || x.dias>viejo) viejo=x.dias;
+  });
+  return {saldo:total, venc, pv, atraso, proxPv, antig:viejo||0};
+}
+function minimoCob(){ return S.cobMin==null?10000:Number(S.cobMin)||0; }
+function diaDeHoy(){
+  const z=zonaDelDia(); if(z!=null) return z;
+  if(S.plan && S.plan.dia===diaKey() && S.plan.zona!=null) return S.plan.zona;
+  return (UI.zone!=null && UI.zone!=='all') ? UI.zone : null;
 }
 function renderCob(){
   renderNavBadge();
   if(UI.vista!=='cob') return;
   const box=document.getElementById('cobView');
-  const orden=S.cobOrden||'vto', filtro=S.cobFiltro||'todos';
-  const filas=S.clients.filter(c=>active(c)).map(c=>({c, d:deudaDe(c)})).filter(x=>x.d && (x.d.saldo>0 || x.d.alertas>0));
-  const tot=filas.reduce((a,x)=>{ a.saldo+=Math.max(x.d.saldo,0); a.venc+=x.d.vencido; a.pv+=x.d.porVencer; return a; },{saldo:0,venc:0,pv:0});
-  const resto=Math.max(tot.saldo-tot.venc-tot.pv,0), base=Math.max(tot.saldo, tot.venc+tot.pv, 1);
-  let lista=filas.filter(x=> filtro==='venc' ? x.d.vencido>0 : filtro==='pv' ? x.d.porVencer>0 : true);
-  if(orden==='monto') lista.sort((a,b)=>b.d.saldo-a.d.saldo);
-  else lista.sort((a,b)=>(a.d.proximo==null?1e9:a.d.proximo)-(b.d.proximo==null?1e9:b.d.proximo) || b.d.vencido-a.d.vencido);
-  const max=Math.max(...lista.map(x=>Math.max(x.d.saldo, x.d.vencido+x.d.porVencer)),1);
-  const nV=filas.filter(x=>x.d.vencido>0).length, nP=filas.filter(x=>x.d.porVencer>0).length;
+  const orden=S.cobOrden==='antig'?'antig':'monto', filtro=['hoy','venc','pv','todos'].indexOf(S.cobFiltro)>=0?S.cobFiltro:'hoy';
+  const min=minimoCob(), hoyZ=diaDeHoy();
+  const filas=S.clients.filter(c=>active(c)).map(c=>({c, d:deudaNeta(c)})).filter(x=>x.d && x.d.saldo>0 && x.d.saldo>=min);
+  const vencidos=filas.filter(x=>x.d.venc>0), totV=vencidos.reduce((a,x)=>a+x.d.venc,0);
+  let lista=filas.filter(x=> filtro==='hoy' ? (hoyZ!=null && x.c.zona===hoyZ) : filtro==='venc' ? x.d.venc>0 : filtro==='pv' ? x.d.pv>0 : true);
+  if(orden==='monto') lista.sort((a,b)=>b.d.saldo-a.d.saldo); else lista.sort((a,b)=>b.d.antig-a.d.antig);
+  const n=f=>filas.filter(x=> f==='hoy' ? (hoyZ!=null && x.c.zona===hoyZ) : f==='venc' ? x.d.venc>0 : f==='pv' ? x.d.pv>0 : true).length;
+  const opt=(v,t)=>`<option value="${v}" ${filtro===v?'selected':''}>${t} (${n(v)})</option>`;
   let h=`<div class="cob-head"><div><h2>Cobranzas</h2><small>${actualizadoTexto()}</small></div>
     <button class="ibtn dark" id="cobAct" aria-label="Actualizar deudas" ${actualizandoDeudas?'disabled':''}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="${actualizandoDeudas?'gira':''}"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><polyline points="20 4 20 9 15 9"/></svg></button></div>`;
   if(!S.deudasAct){
     h+=`<div class="cob-vacio"><p>Todavía no se trajeron las deudas del sistema.</p><p class="hint">Tocá el botón de actualizar. Si es la primera vez, primero hay que cargar tu usuario y clave del sistema en el script de la planilla.</p></div>`;
   } else {
-    h+=`<div class="cob-total"><small>Deuda total de tus clientes</small><b>${plata(tot.saldo)}</b>
-      <div class="stack" aria-hidden="true"><i class="s-venc" style="width:${tot.venc/base*100}%"></i><i class="s-pv" style="width:${tot.pv/base*100}%"></i><i class="s-ok" style="width:${resto/base*100}%"></i></div>
-      <div class="leyenda"><span><i class="s-venc"></i>Vencido <b>${plataCorta(tot.venc)}</b></span><span><i class="s-pv"></i>Por vencer <b>${plataCorta(tot.pv)}</b></span><span><i class="s-ok"></i>Al día <b>${plataCorta(resto)}</b></span></div></div>
+    h+=`<div class="cob-total"><small>Vencido</small><b>${plata(totV)}</b><span>en ${vencidos.length} ${vencidos.length===1?'cliente':'clientes'}</span></div>
     <div class="cob-ctrl">
-      <div class="seg" role="group" aria-label="Ordenar"><button data-o="vto" aria-pressed="${orden==='vto'}">Por vencimiento</button><button data-o="monto" aria-pressed="${orden==='monto'}">Por monto</button></div>
-      <div class="filtros"><button data-f="todos" aria-pressed="${filtro==='todos'}">Todos <span>${filas.length}</span></button><button data-f="venc" aria-pressed="${filtro==='venc'}">Vencidos <span>${nV}</span></button><button data-f="pv" aria-pressed="${filtro==='pv'}">Por vencer <span>${nP}</span></button></div>
-    </div>`;
-    if(!lista.length) h+=`<div class="cob-vacio ok"><b>${filas.length?'No hay clientes en este filtro':'Ningún cliente con deuda'}</b></div>`;
+      <select id="cobFiltro" aria-label="Mostrar">${opt('hoy', hoyZ!=null?'Hoy · Día '+(hoyZ+1):'Hoy')}${opt('venc','Vencidos')}${opt('pv','Por vencer')}${opt('todos','Todos')}</select>
+      <div class="seg" role="group" aria-label="Ordenar"><button data-o="monto" aria-pressed="${orden==='monto'}">Monto</button><button data-o="antig" aria-pressed="${orden==='antig'}">Antigüedad</button></div>
+    </div>
+    <p class="cob-nota">No se muestran deudas menores a ${plata(min)} ni saldos a favor.</p>`;
+    if(filtro==='hoy' && hoyZ==null) h+=`<div class="cob-vacio"><b>Todavía no hay un día elegido</b><p class="hint">Elegí un día en los botones de arriba del mapa, o marcá tu primera visita, y acá van a aparecer los deudores de ese recorrido.</p></div>`;
+    else if(!lista.length) h+=`<div class="cob-vacio ok"><b>${filtro==='hoy'?'Nadie con deuda en el Día '+(hoyZ+1):'No hay clientes en este filtro'}</b></div>`;
     else h+=`<ul class="score">`+lista.map(({c,d})=>{
-      const okD=Math.max(d.saldo-d.vencido-d.porVencer,0);
-      const est=d.vencido>0?'venc':d.porVencer>0?'pv':'ok';
+      const est=d.venc>0?'venc':d.pv>0?'pv':'ok';
+      const lineas=[];
+      if(d.venc>0) lineas.push(`<span class="t-venc">Vencido ${plata(d.venc)} · hace ${d.atraso} ${d.atraso===1?'día':'días'}</span>`);
+      if(d.pv>0) lineas.push(`<span class="t-pv">Por vencer ${plata(d.pv)} · ${d.proxPv===0?'vence hoy':'en '+d.proxPv+' '+(d.proxPv===1?'día':'días')}</span>`);
+      if(!lineas.length) lineas.push(`<span class="t-ok">Al día</span>`);
       return `<li data-id="${c.id}" class="${est}"><div class="sc-top"><span class="sc-nom"><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre)}</span><b>${plata(d.saldo)}</b></div>
-        <div class="bar" aria-hidden="true"><i class="s-venc" style="width:${d.vencido/max*100}%"></i><i class="s-pv" style="width:${d.porVencer/max*100}%"></i><i class="s-ok" style="width:${okD/max*100}%"></i></div>
-        <div class="sc-sub"><span class="sc-est">${textoEstadoCliente(d)}</span>${d.vencido>0?`<span>Vencido ${plataCorta(d.vencido)}</span>`:''}${mediosDe(c).length?`<span>${esc(mediosDe(c).join(' · '))}</span>`:''}${c.zona!=null?`<span class="sc-z" style="--c:${zoneColor(c.zona)}">Zona ${c.zona+1}</span>`:''}</div></li>`;
+        <div class="sc-sub">${lineas.join('')}${filtro!=='hoy'&&c.zona!=null?`<span class="sc-z" style="--c:${zoneColor(c.zona)}">Día ${c.zona+1}</span>`:''}</div></li>`;
     }).join('')+`</ul>`;
   }
   box.innerHTML=h;
   const act=document.getElementById('cobAct'); if(act) act.onclick=actualizarDeudasAhora;
+  const sf=document.getElementById('cobFiltro'); if(sf) sf.onchange=()=>{ S.cobFiltro=sf.value; save(); renderCob(); };
   box.onclick=e=>{
     const o=e.target.closest('[data-o]'); if(o){ S.cobOrden=o.dataset.o; save(); renderCob(); return; }
-    const f=e.target.closest('[data-f]'); if(f){ S.cobFiltro=f.dataset.f; save(); renderCob(); return; }
     const li=e.target.closest('li[data-id]'); if(li) openClient(li.dataset.id, 1);
   };
 }
