@@ -2041,13 +2041,27 @@ async function syncSheet(silent){
   try{ await syncSheetInner(silent); } finally { syncing=false; }
   tareasDeZonas();
 }
+// Zonas armadas a mano a partir de la hoja de ruta en Excel (noviembre 2026). -1 = a la zona más cercana.
+const ZONAS_EXCEL_V1={"4915":0,"2203":0,"2705":0,"273":0,"3173":0,"979":0,"4248":0,"4009":0,"4686":0,"3534":0,"1869":0,"4821":1,"1998":1,"4050":1,"4176":1,"1827":1,"2466":1,"1908":1,"4104":1,"2148":1,"4042":1,"2059":2,"4657":2,"2223":2,"3413":2,"1109":2,"4052":2,"4424":2,"2149":2,"869":2,"1854":2,"2782":3,"4707":3,"975":3,"2626":3,"5003":3,"4400":3,"4171":3,"4795":3,"3854":3,"2625":3,"2296":3,"2614":3,"4019":3,"3356":3,"2538":3,"4006":3,"4034":3,"2127":4,"4098":4,"2378":4,"2687":4,"4516":4,"1793":4,"4828":4,"4827":4,"2704":5,"1722":5,"2408":5,"4849":5,"4740":5,"4024":5,"4547":5,"1900":5,"1780":5,"2619":5,"4153":5,"2133":5,"2507":6,"2103":6,"4073":6,"2982":6,"2375":6,"2675":6,"1756":6,"2097":6,"4581":6,"3498":7,"2768":7,"2221":7,"2218":7,"4639":7,"2298":7,"4326":7,"1838":7,"4744":7,"4138":7,"2544":8,"1884":8,"4443":8,"4879":8,"2620":8,"1744":8,"921":8,"1830":8,"2503":8,"2135":9,"3286":9,"1741":9,"4011":9,"2143":9,"4002":9,"2094":9,"2371":9,"2234":9,"1775":10,"1755":10,"1746":10,"3061":10,"1745":10,"1833":10,"1679":10,"4527":10,"4888":10,"2176":10,"2189":10,"1845":10,"4666":10,"4858":10,"2037":11,"4047":11,"2062":11,"2349":11,"4681":11,"3292":11,"4008":11,"1909":11,"1772":11,"4713":12,"4994":12,"3277":12,"3444":12,"2879":12,"3366":12,"3402":12,"4087":12,"4020":12,"4067":12,"4162":12,"4642":13,"4032":13,"4078":13,"4320":13,"4848":13,"2112":13,"4481":13,"1915":13,"2118":13,"2197":13,"2115":13,"2266":14,"2188":14,"4040":14,"4094":14,"2119":14,"2272":14,"4147":14,"2098":14,"2195":14,"2265":14,"2380":14,"2117":14,"2262":14,"4297":14,"2821":14,"1863":15,"2250":15,"4048":15,"4778":15,"2657":15,"4502":15,"4464":15,"2399":15,"2423":15,"1923":15,"1778":15,"4261":16,"4816":16,"4001":16,"4031":16,"3214":16,"1922":16,"4785":16,"2211":16,"2615":16,"2473":16,"4155":17,"4128":17,"4358":17,"4788":17,"2242":17,"1808":17,"1694":17,"4220":17,"2291":18,"1860":18,"1897":18,"1889":18,"4377":18,"4569":18,"4450":18,"1653":18,"1773":18,"2397":18,"4156":18,"4360":19,"3529":19,"2210":19,"2486":19,"4355":19,"4039":19,"1839":19,"2832":19,"3172":19,"2373":19,"4786":19,"2746":19,"4404":19,"2142":19,"1812":20,"1718":20,"1721":20,"1770":20,"4301":20,"4300":20,"1702":20,"1779":20,"3248":20,"4557":20,"4060":20,"4671":-1,"4631":-1,"4896":-1};
+function aplicarZonasExcel(){
+  if(S.zonasExcelV1 || !S.clients.length) return;
+  const porCod={}; S.clients.forEach(c=>{ porCod[String(c.codigo||'').trim()]=c; });
+  const cercanos=[]; let n=0;
+  Object.keys(ZONAS_EXCEL_V1).forEach(k=>{ const c=porCod[k], z=ZONAS_EXCEL_V1[k]; if(!c || c.baja) return;
+    if(z<0){ cercanos.push(c); return; }
+    if(c.zona!==z){ c.zona=z; queueCampos(c, zonaCampo(c), true); n++; } delete c.zonaManual; });
+  // los que no están en el Excel o se marcaron para la zona más cercana
+  S.clients.filter(c=>active(c) && located(c) && (cercanos.indexOf(c)>=0 || ZONAS_EXCEL_V1[String(c.codigo||'').trim()]==null)).forEach(c=>{
+    const z=zonasCercanas(c, null, Infinity)[0]; if(z!=null && c.zona!==z){ c.zona=z; queueCampos(c, zonaCampo(c), true); n++; } });
+  S.zonasExcelV1=true; S.zonasTopeV1=true; delete S.hoyZona; S.zonaRevisada=diaKey();
+  save(); scheduleFlush(); render();
+  toast(`Zonas actualizadas según la hoja de ruta: ${zoneCount()} zonas`, 5000);
+}
 function tareasDeZonas(){
   if(UI.geocoding || !S.clients.some(located)) return;
-  if(!S.zonasTopeV1 && zoneCount()){
-    const n=rebalancearZonas(); S.zonasTopeV1=true; save();
-    if(n){ render(); toast(`Se reacomodaron ${n} clientes de zonas que pasaban de ${S.maxZona||12}`, 5000); }
-  }
-  revisarDiaAnterior();
+  aplicarZonasExcel();
+  // El reacomodo automático (zonas de más de 12, mudanza del día siguiente y zonas chicas) quedó desactivado:
+  // las zonas solo cambian cuando respondés "Sí" a "¿Agregar a la Zona X?".
 }
 function ultimasVisitas(filas){
   const txt=new Map(), best=new Map();
