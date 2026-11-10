@@ -855,6 +855,9 @@ body.vista-cob #cobView{display:block}
 .leyenda span{display:flex;align-items:center;gap:6px}
 .leyenda i{width:10px;height:10px;border-radius:3px;display:inline-block}
 .leyenda b{font-weight:700}
+.comp-cerr{margin:8px 0 12px}
+.comp-cerr summary{cursor:pointer;color:var(--ink-2);font-size:14px;font-weight:600;padding:8px 0}
+.comp-cerr .comp{opacity:.75}
 .cob-ctrl{margin:14px 0 6px;display:flex;gap:8px;align-items:stretch}
 .cob-ctrl select{flex:1 1 55%;min-width:0;min-height:44px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);font:inherit;font-weight:600;font-size:15px;padding:0 10px;color:var(--ink)}
 .cob-ctrl .seg{flex:1 1 45%}
@@ -1353,7 +1356,7 @@ function render(){
     const col = v ? '#9aa7ab' : zoneColor(c.zona);
     const html = dim
       ? `<div class="${cls}" style="--c:${col}"><span></span></div>`
-      : `<div class="pw"><div class="${cls}" style="--c:${col}"><span>${label}</span></div>${(deudaDe(c)||{}).vencido>0?'<i class="dbt" title="Deuda vencida"></i>':''}${c.geoDudosa?'<i class="dud" title="Ubicación a revisar">?</i>':''}${showLbl?`<div class="lbl" style="--c:${col}"><b style="color:${col}">${esc(codeOf(c))}</b>${esc(c.nombre||'')}</div>`:''}</div>`;
+      : `<div class="pw"><div class="${cls}" style="--c:${col}"><span>${label}</span></div>${(d=>d&&d.vencido>0&&d.saldoNeto>=minimoCob())(deudaDe(c))?'<i class="dbt" title="Deuda vencida"></i>':''}${c.geoDudosa?'<i class="dud" title="Ubicación a revisar">?</i>':''}${showLbl?`<div class="lbl" style="--c:${col}"><b style="color:${col}">${esc(codeOf(c))}</b>${esc(c.nombre||'')}</div>`:''}</div>`;
     const icon = L.divIcon({className:'', html, iconSize: dim?[14,14]:[30,30], iconAnchor: dim?[7,7]:[4,30]});
     // Separar pines con la misma dirección
     const key = c.lat.toFixed(5)+','+c.lng.toFixed(5); const n = seen.get(key)||0; seen.set(key,n+1);
@@ -1449,7 +1452,7 @@ function openClient(id, tab){
   h += `<label for="resumen">Resumen de esta visita</label><textarea id="resumen" placeholder="Con quién hablaste, qué pidió, qué quedó pendiente…"></textarea>
   <div class="row"><button class="btn dark" data-act="resumen">Guardar resumen</button></div>`;
   if(c.notas) h += `<h3>Comentarios</h3><div class="notes">${esc(c.notas)}</div>`;
-  h += `<div class="row"><button class="btn small" data-act="edit">Editar</button><button class="btn small" data-act="move">Mover pin</button>${!c.baja&&located(c)?'<button class="btn small" data-act="zona">Mover a zona…</button>':''}${c.baja?'<button class="btn small" data-act="alta">Reactivar</button>':'<button class="btn small warn" data-act="baja">No existe más</button>'}</div>`;
+  h += `<div class="row"><button class="btn small" data-act="edit">Editar</button><button class="btn small" data-act="move">Mover pin</button>${!c.baja&&located(c)?'<button class="btn small" data-act="zona">Mover a otro día…</button>':''}${c.baja?'<button class="btn small" data-act="alta">Reactivar</button>':'<button class="btn small warn" data-act="baja">No existe más</button>'}</div>`;
   const dd = deudaDe(c);
   const badge = dd && dd.alertas>0 ? `<span class="tb ${dd.vencido>0?'venc':'pv'}">${dd.alertas}</span>` : '';
   h = cab + `<div class="tabs" role="tablist"><button role="tab" data-tab="0">Datos</button><button role="tab" data-tab="1">Cobranzas${badge}</button></div>
@@ -2831,7 +2834,7 @@ function mostrarPlan(){
     let det = w ? 'Horario: '+fmtHorario(w) : 'Sin horario';
     const ddp=deudaDe(c); if(ddp && ddp.vencido>0) det += ' · Vencido '+plata(ddp.vencido);
     let marca='', extra='';
-    if(e.estado==='cerrado'){ marca='<b style="color:var(--warn)">'+(e.llegada>=jornada()[1]-5 ? 'No llegás antes de las '+fmtHM(jornada()[1]) : 'Va a estar cerrado')+'</b>'; extra=`<button class="btn small" data-mv="${c.id}">Pasar a otra zona</button>`; }
+    if(e.estado==='cerrado'){ marca='<b style="color:var(--warn)">'+(e.llegada>=jornada()[1]-5 ? 'No llegás antes de las '+fmtHM(jornada()[1]) : 'Va a estar cerrado')+'</b>'; extra=`<button class="btn small" data-mv="${c.id}">Pasar a otro día</button>`; }
     else if(e.espera>=5) marca=`<b style="color:var(--warn)">Espera ${Math.round(e.espera)} min (abre ${fmtHM(e.llegada+e.espera)})</b>`;
     h+=`<li style="--c:${e.estado==='cerrado'?'#c2410c':zoneColor(z)}" data-id="${c.id}"><span class="num">${k+1}</span><span class="txt"><b>${fmtHM(e.llegada)} · <span class="code">${esc(codeOf(c))}</span>${esc(c.nombre)}</b><small>${esc(det)}</small>${marca?'<small>'+marca+'</small>':''}</span>${extra}</li>`;
   });
@@ -2875,8 +2878,7 @@ function deudaDe(c){
   const d=(S.deudas||{})[String(c.codigo||'').trim()];
   if(!d || !d.items || !d.items.length) return null;
   const h=hoy0(), plazo=plazoDe(c);
-  let vencido=0, porVencer=0, alDia=0, proximo=null, maxAtraso=0, alertas=0;
-  const items=d.items.map(x=>{
+  let items=d.items.map(x=>{
     const f=fechaTs(x.fecha); const dias=f?Math.round((h-f)/864e5):null;
     const v=new Date(f); v.setDate(v.getDate()+plazo); const vence=v.getTime();
     const restan=Math.round((vence-h)/864e5);
@@ -2886,14 +2888,27 @@ function deudaDe(c){
     if(x.importe<=0) estado='credito';
     else if(marcada && diasMarcada<=DIAS_COBRADA) estado='cobrada';
     else estado = restan<0 ? 'vencida' : restan<=DIAS_AVISO ? 'porvencer' : 'aldia';
-    const revisar = !!marcada && estado!=='cobrada' && estado!=='credito';
-    if(estado==='vencida'){ vencido+=x.importe; maxAtraso=Math.max(maxAtraso,-restan); alertas++; }
-    if(estado==='porvencer'){ porVencer+=x.importe; alertas++; }
-    if(estado==='aldia') alDia+=x.importe;
-    if(['vencida','porvencer','aldia'].includes(estado) && (proximo==null || restan<proximo)) proximo=restan;
-    return Object.assign({}, x, {dias, vence, restan, estado, marcada, revisar});
-  }).sort((a,b)=>(fechaTs(a.fecha)||0)-(fechaTs(b.fecha)||0));
-  return {saldo:d.saldo, items, vencido, porVencer, alDia, proximo, maxAtraso, alertas};
+    return Object.assign({}, x, {dias, vence, restan, estado, marcada, pend:0});
+  });
+  // El saldo del sistema se reparte desde la factura más nueva hacia la más vieja: los pagos y las notas
+  // de crédito cancelan primero lo más viejo. Lo que no alcanza a cubrir el saldo queda "cancelado".
+  const marcadas=items.filter(x=>x.estado==='cobrada').reduce((a,x)=>a+x.importe,0);
+  let resto=Math.max((Number(d.saldo)||0)-marcadas,0);
+  const saldoNeto=resto;
+  items.filter(x=>['vencida','porvencer','aldia'].includes(x.estado)).sort((a,b)=>(fechaTs(b.fecha)||0)-(fechaTs(a.fecha)||0)).forEach(x=>{
+    x.pend=Math.min(x.importe,resto); resto-=x.pend;
+    if(x.pend<=0) x.estado='cancelada';
+  });
+  let vencido=0, porVencer=0, alDia=0, proximo=null, maxAtraso=0, alertas=0, antig=0, proxPv=null;
+  items.forEach(x=>{
+    x.revisar = !!x.marcada && ['vencida','porvencer','aldia'].includes(x.estado);
+    if(x.estado==='vencida'){ vencido+=x.pend; maxAtraso=Math.max(maxAtraso,-x.restan); alertas++; }
+    if(x.estado==='porvencer'){ porVencer+=x.pend; alertas++; proxPv=proxPv==null?x.restan:Math.min(proxPv,x.restan); }
+    if(x.estado==='aldia') alDia+=x.pend;
+    if(['vencida','porvencer','aldia'].includes(x.estado)){ if(proximo==null || x.restan<proximo) proximo=x.restan; antig=Math.max(antig, x.dias||0); }
+  });
+  items.sort((a,b)=>(fechaTs(a.fecha)||0)-(fechaTs(b.fecha)||0));
+  return {saldo:d.saldo, saldoNeto, items, vencido, porVencer, alDia, proximo, maxAtraso, alertas, antig, proxPv};
 }
 function textoVto(r){ return r<0 ? `vencida hace ${-r} ${-r===1?'día':'días'}` : r===0 ? 'vence hoy' : `vence en ${r} ${r===1?'día':'días'}`; }
 function textoEstadoCliente(dd){
@@ -2915,21 +2930,28 @@ function cobranzasHtml(c){
   if(!S.deudasAct) h+=`<div class="cob-vacio"><p>Todavía no se trajeron las deudas del sistema.</p></div>`;
   else if(!dd) h+=`<div class="cob-vacio ok"><b>Sin deuda</b><p>No figuran comprobantes pendientes.</p></div>`;
   else {
-    h+=`<div class="cob-saldo"><small>Saldo en el sistema</small><b>${plata(dd.saldo)}</b></div>`;
+    h+=`<div class="cob-saldo"><small>${dd.saldo<0?'Saldo a favor del cliente':'Saldo en el sistema'}</small><b>${plata(Math.abs(dd.saldo))}</b></div>`;
     h+=`<div class="cob-res">${dd.vencido>0?`<span class="t-venc">Vencido ${plata(dd.vencido)}</span>`:''}${dd.porVencer>0?`<span class="t-pv">Por vencer ${plata(dd.porVencer)}</span>`:''}${dd.vencido<=0&&dd.porVencer<=0?'<span class="t-ok">Nada vencido</span>':''}</div>`;
   }
   h+=`<div class="cob-conf"><label for="cobPlazo">Plazo de pago</label><div class="plazo"><input id="cobPlazo" type="number" min="0" max="365" inputmode="numeric" value="${plazo}" placeholder="30"><span>días</span></div>
     <label>Formas de pago habilitadas</label><div class="medios" role="group">${MEDIOS.map(m=>`<button type="button" data-act="medio" data-v="${m}" aria-pressed="${mediosDe(c).indexOf(m)>=0}"><span class="chk" aria-hidden="true"></span>${m}</button>`).join('')}</div></div>`;
   if(dd){
-    h+=`<h3>Comprobantes</h3><ul class="comp">`+dd.items.map(x=>{
-      const cls={vencida:'venc',porvencer:'pv',aldia:'ok',cobrada:'cob',credito:'cred'}[x.estado];
-      const est = x.estado==='credito' ? 'Crédito a favor del cliente'
+    const fila=x=>{
+      const cls={vencida:'venc',porvencer:'pv',aldia:'ok',cobrada:'cob',credito:'cred',cancelada:'cred'}[x.estado];
+      const est = x.estado==='credito' ? 'Pago o nota de crédito (ya descontado del saldo)'
+        : x.estado==='cancelada' ? 'Cancelada con pagos o notas de crédito'
         : x.estado==='cobrada' ? `Marcada como cobrada el ${esc(x.marcada)}`
         : `${x.dias} días · ${textoVto(x.restan)} (${fmtDM(x.vence)})`;
+      const parcial = x.pend>0 && x.pend<x.importe ? `<small class="est">Pagada en parte: resta ${plata(x.pend)}</small>` : '';
       const extra = x.revisar ? `<small class="rev">La marcaste cobrada el ${esc(x.marcada)} y sigue pendiente en el sistema</small>` : '';
-      const btn = x.importe>0 ? (x.estado==='cobrada' ? `<button class="btn small" data-act="cobrada" data-n="${esc(x.numero)}" data-v="0">Deshacer</button>` : `<button class="btn small" data-act="cobrada" data-n="${esc(x.numero)}" data-v="1">Cobrada</button>`) : '';
-      return `<li class="${cls}"><div class="c1"><b>${esc(x.tipo)}</b><small>${esc(x.numero)} · ${esc(x.fecha)}</small><small class="est">${est}</small>${extra}</div><div class="c2"><b>${plata(x.importe)}</b>${btn}</div></li>`;
-    }).join('')+`</ul>`;
+      const btn = x.estado==='cobrada' ? `<button class="btn small" data-act="cobrada" data-n="${esc(x.numero)}" data-v="0">Deshacer</button>`
+        : ['vencida','porvencer','aldia'].includes(x.estado) ? `<button class="btn small" data-act="cobrada" data-n="${esc(x.numero)}" data-v="1">Cobrada</button>` : '';
+      return `<li class="${cls}"><div class="c1"><b>${esc(x.tipo)}</b><small>${esc(x.numero)} · ${esc(x.fecha)}</small><small class="est">${est}</small>${parcial}${extra}</div><div class="c2"><b>${plata(x.pend>0?x.pend:x.importe)}</b>${btn}</div></li>`;
+    };
+    const abiertas=dd.items.filter(x=>['vencida','porvencer','aldia','cobrada'].includes(x.estado));
+    const cerradas=dd.items.filter(x=>x.estado==='cancelada'||x.estado==='credito');
+    h+=`<h3>Comprobantes pendientes</h3>`+(abiertas.length?`<ul class="comp">${abiertas.map(fila).join('')}</ul>`:`<p class="hint">No hay facturas pendientes de cobro.</p>`);
+    if(cerradas.length) h+=`<details class="comp-cerr"><summary>Ver ${cerradas.length} ${cerradas.length===1?'comprobante cancelado':'comprobantes cancelados'} (pagos y notas de crédito)</summary><ul class="comp">${cerradas.map(fila).join('')}</ul></details>`;
   }
   h+=`<p class="hint">${actualizadoTexto()}.</p>`;
   return h;
@@ -2975,17 +2997,7 @@ function renderNavBadge(){
 // la más vieja (los pagos y notas de crédito cancelan primero lo más viejo)
 function deudaNeta(c){
   const d=deudaDe(c); if(!d) return null;
-  const abiertas=d.items.filter(x=>['vencida','porvencer','aldia'].includes(x.estado));
-  const marcadas=d.items.filter(x=>x.estado==='cobrada').reduce((a,x)=>a+x.importe,0);
-  let resto=Math.max((Number(d.saldo)||0)-marcadas,0);
-  const total=resto; let venc=0, pv=0, viejo=null, atraso=0, proxPv=null;
-  abiertas.slice().sort((a,b)=>(fechaTs(b.fecha)||0)-(fechaTs(a.fecha)||0)).forEach(x=>{
-    const p=Math.min(x.importe,resto); resto-=p; if(p<=0) return;
-    if(x.estado==='vencida'){ venc+=p; atraso=Math.max(atraso,-x.restan); }
-    if(x.estado==='porvencer'){ pv+=p; proxPv=proxPv==null?x.restan:Math.min(proxPv,x.restan); }
-    if(viejo==null || x.dias>viejo) viejo=x.dias;
-  });
-  return {saldo:total, venc, pv, atraso, proxPv, antig:viejo||0};
+  return {saldo:d.saldoNeto, venc:d.vencido, pv:d.porVencer, atraso:d.maxAtraso, proxPv:d.proxPv, antig:d.antig};
 }
 function minimoCob(){ return S.cobMin==null?10000:Number(S.cobMin)||0; }
 function diaDeHoy(){
