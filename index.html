@@ -754,6 +754,9 @@ ul.prod .pn{width:22px;color:var(--ink-2);flex:0 0 auto}
 ul.prod .pd{flex:1 1 auto;min-width:0}
 ul.prod .pq{flex:0 0 auto;margin-left:10px;color:var(--ink-2);font-variant-numeric:tabular-nums}
 ul.prod li.viejo .pd, ul.prod li.viejo .pq{color:#c0392b}
+.ult-compra{margin:8px 0 14px;padding-top:8px;border-top:1px solid var(--line);font-size:14px;color:var(--ink-2)}
+.ult-compra b{color:var(--ink)}
+.ult-compra.viejo b{color:#c0392b}
 .prod-sug{margin:6px 0 14px;padding-top:8px;border-top:1px solid var(--line)}
 .prod-sug small{color:var(--ink-2);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
 .prod-sug ul{list-style:none;margin:4px 0 0;padding:0}
@@ -1751,16 +1754,26 @@ function terminarRevision(msg){
 }
 
 /* ---- Productos que compra el cliente (de las facturas del sistema) ---- */
+// Fecha de la última compra: la que trae el resumen del sistema o, si falta, la más reciente que se conozca
+function ultimaCompraHtml(p, c){
+  let u=p && p.u ? p.u : null;
+  if(!u && p && p.t) p.t.forEach(x=>{ if(!u || x[2]>u) u=x[2]; });
+  if(!u){ const d=deudaDe(c); if(d) d.items.forEach(x=>{ if(x.importe>0){ const t=fechaTs(x.fecha); if(t){ const iso=new Date(t).toISOString().slice(0,10); if(!u||iso>u) u=iso; } } }); }
+  if(!u) return `<p class="ult-compra">Sin compras en los últimos 12 meses</p>`;
+  const f=new Date(u+'T12:00:00'), dias=Math.max(0,Math.round((hoy0()-new Date(f.getFullYear(),f.getMonth(),f.getDate()).getTime())/864e5));
+  const hace=dias===0?'hoy':dias===1?'ayer':`hace ${dias} días`;
+  return `<p class="ult-compra${dias>60?' viejo':''}">Última compra: <b>${f.toLocaleDateString('es-AR')}</b> · ${hace}</p>`;
+}
 function productosHtml(c){
   const p=(S.productos||{})[String(c.codigo||'').trim()];
-  if(!p || !(p.t||[]).length) return '';
+  if(!p || !(p.t||[]).length) return (S.prodAct||p) ? `<h3>Compró anteriormente</h3>${ultimaCompraHtml(p, c)}` : '';
   const hoyMs=Date.now(), lim=60*864e5;
   const fmtCant=q=>Number(q).toLocaleString('es-AR',{maximumFractionDigits:2})+' u';
   let h=`<h3>Compró anteriormente <small class="prod-per">últimos 12 meses</small></h3><ul class="prod">`;
   h+=p.t.map((x,i)=>{ const f=new Date(x[2]+'T12:00:00'), viejo=hoyMs-f.getTime()>lim;
     return `<li class="${viejo?'viejo':''}" title="Última compra: ${f.toLocaleDateString('es-AR')}"><span class="pn">${i+1}.</span><span class="pd">${esc(x[0])}</span><span class="pq">${fmtCant(x[1])}</span></li>`; }).join('');
   h+='</ul>';
-  if((p.s||[]).length) h+=`<div class="prod-sug"><small>Podría interesarle</small><ul>${p.s.map(x=>`<li><span>+</span>${esc(x)}</li>`).join('')}</ul></div>`;
+  h+=ultimaCompraHtml(p, c);
   return h;
 }
 

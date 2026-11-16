@@ -22,7 +22,7 @@
  *
  * Productos: actualizarProductos() lee las facturas (PDF) de los últimos 12 meses de cada cliente,
  * guarda los renglones en la hoja Productos (oculta) y arma el resumen que muestra la ficha
- * ("Compró anteriormente" y "Podría interesarle"). También completa la columna Rubro cuando está
+ * ("Compró anteriormente" y la fecha de la última compra). También completa la columna Rubro cuando está
  * vacía. La primera carga se hace en tandas solas (ejecutar cargarProductosAhora una vez); después
  * se actualiza cada mañana junto con las deudas.
  */
@@ -622,7 +622,7 @@ function out(o) {
 
 /* ================= Productos de las facturas ================= */
 // Lee las facturas (PDF) de los últimos 12 meses de cada cliente, guarda sus renglones en la hoja
-// Productos y arma un resumen por cliente para la app: lo que más compró y sugerencias por rubro.
+// Productos y arma un resumen por cliente para la app: lo que más compró y la fecha de su última compra.
 const H_PRODUCTOS = 'Productos', H_PROD_RES = 'ProductosResumen';
 const COLS_PRODUCTOS = ['Código', 'Fecha', 'Comprobante', 'Número', 'Artículo', 'Descripción', 'Cantidad', 'Subtotal'];
 const RUBROS_NOMBRE = [
@@ -699,6 +699,9 @@ function hojaProductos(ss) {
   }
   return sh;
 }
+
+// Ejecutar desde el editor para rearmar el resumen que ve la app sin leer facturas nuevas
+function actualizarResumenProductos() { const ss = SpreadsheetApp.getActiveSpreadsheet(); resumirProductos(ss); PropertiesService.getScriptProperties().setProperty('prodAct', String(Date.now())); }
 
 // Ejecutar desde el editor para la primera carga (sigue sola en tandas hasta terminar)
 function cargarProductosAhora() { continuarProductos(); }
@@ -781,13 +784,13 @@ function fechaTexto(s) {
   return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
 }
 
-function leerRenglones(ss) {
+function leerRenglones(ss, incluirSinRenglones) {
   const sh = ss.getSheetByName(H_PRODUCTOS);
   if (!sh || sh.getLastRow() < 2) return [];
   const desde = new Date(); desde.setFullYear(desde.getFullYear() - 1); desde.setHours(0, 0, 0, 0);
   return sh.getRange(2, 1, sh.getLastRow() - 1, COLS_PRODUCTOS.length).getValues()
     .map(f => ({ cli: String(f[0]).trim(), fecha: fechaTexto(f[1]), art: String(f[4]).trim(), desc: String(f[5]).trim(), cant: Number(f[6]) || 0, sub: Number(f[7]) || 0 }))
-    .filter(r => r.art && r.fecha && r.fecha >= desde);
+    .filter(r => (r.art || incluirSinRenglones) && r.fecha && r.fecha >= desde);
 }
 
 // Rubro: primero por el nombre; si no se puede, por el parecido de lo que compra con cada rubro.
@@ -823,36 +826,24 @@ function asignarRubros(ss) {
   vacios.filter(v => v[1]).forEach(v => cl.getRange(v[0] + 1, iRub + 1).setValue(v[1]));
 }
 
-// Resumen por cliente para la app: top 5 por plata (con la última compra) y 3 sugerencias de su rubro
+// Resumen por cliente para la app: top 5 por plata (con la última compra de cada artículo) y la fecha
+// de la última factura del cliente
 function resumirProductos(ss) {
-  const ren = leerRenglones(ss);
-  const cl = ss.getSheetByName(H_CLIENTES), data = cl.getDataRange().getDisplayValues(), head = data[0].map(norm);
-  const iCod = head.indexOf('codigo'), iRub = head.indexOf('rubro');
-  const rubro = {}; data.slice(1).forEach(f => { const c = String(f[iCod]).trim(); if (c) rubro[c] = iRub >= 0 ? String(f[iRub]).trim() : ''; });
-  const porCli = {}, nombreArt = {};
+  const ren = leerRenglones(ss, true);
+  const porCli = {}, nombreArt = {}, ultima = {};
   ren.forEach(r => {
+    if (!ultima[r.cli] || r.fecha > ultima[r.cli]) ultima[r.cli] = r.fecha;
+    if (!r.art) return;
     const a = (porCli[r.cli] = porCli[r.cli] || {})[r.art] = (porCli[r.cli][r.art] || { plata: 0, cant: 0, ult: null });
     a.plata += r.sub; a.cant += r.cant; if (!a.ult || r.fecha > a.ult) { a.ult = r.fecha; nombreArt[r.art] = r.desc; }
   });
-  // Qué artículos compra cada rubro (cantidad de clientes distintos)
-  const rub = {}, todos = { n: 0, art: {} };
-  Object.keys(porCli).forEach(c => {
-    const g = rubro[c] || '';
-    const grupo = rub[g] = rub[g] || { n: 0, art: {} };
-    grupo.n++; todos.n++;
-    Object.keys(porCli[c]).forEach(a => { grupo.art[a] = (grupo.art[a] || 0) + 1; todos.art[a] = (todos.art[a] || 0) + 1; });
-  });
+  const tz = Session.getScriptTimeZone(), f = d => Utilities.formatDate(d, tz, 'yyyy-MM-dd');
   const filas = [];
-  Object.keys(porCli).forEach(c => {
-    const arts = porCli[c];
+  Object.keys(ultima).forEach(c => {
+    const arts = porCli[c] || {};
     const top = Object.keys(arts).sort((a, b) => arts[b].plata - arts[a].plata).slice(0, 5)
-      .map(a => [nombreArt[a], Math.round(arts[a].cant * 100) / 100, Utilities.formatDate(arts[a].ult, Session.getScriptTimeZone(), 'yyyy-MM-dd')]);
-    let g = rub[rubro[c] || ''];
-    if (!rubro[c] || !g || g.n < 5) g = todos;
-    const minimo = Math.max(2, Math.ceil(g.n * 0.25));
-    const sug = Object.keys(g.art).filter(a => !arts[a] && g.art[a] >= minimo)
-      .sort((a, b) => g.art[b] - g.art[a]).slice(0, 3).map(a => nombreArt[a]);
-    filas.push([c, JSON.stringify({ t: top, s: sug })]);
+      .map(a => [nombreArt[a], Math.round(arts[a].cant * 100) / 100, f(arts[a].ult)]);
+    filas.push([c, JSON.stringify({ t: top, u: f(ultima[c]) })]);
   });
   let sh = ss.getSheetByName(H_PROD_RES);
   if (!sh) { sh = ss.insertSheet(H_PROD_RES, ss.getSheets().length); sh.getRange('A:B').setNumberFormat('@'); sh.hideSheet(); }
