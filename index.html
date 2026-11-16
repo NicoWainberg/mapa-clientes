@@ -820,6 +820,23 @@ input:focus,textarea:focus,button:focus-visible{outline:3px solid var(--sel);out
 #banner{position:fixed;left:10px;right:10px;bottom:calc(var(--safe-b) + 76px);z-index:700;background:#14313a;color:#fff;border-radius:14px;padding:12px 14px;display:none;align-items:center;gap:10px;box-shadow:0 6px 18px rgba(0,0,0,.3)}
 #banner .t{flex:1;font-weight:600}
 #banner button{border:0;border-radius:10px;padding:9px 14px;background:var(--sel);color:#14313a;font-weight:700}
+#banner button.b2{background:rgba(255,255,255,.14);color:#fff}
+#dirBox{position:fixed;left:10px;right:10px;top:calc(var(--safe-t) + 10px);z-index:710;background:var(--card);border-radius:16px;box-shadow:0 8px 24px rgba(10,30,36,.3);padding:14px;max-height:60vh;overflow-y:auto}
+#dirBox[hidden]{display:none}
+.dir-x{position:absolute;right:6px;top:4px;border:0;background:none;font-size:26px;line-height:1;color:var(--ink-2);padding:4px 8px}
+.dir-form{display:flex;gap:8px;margin-right:26px}
+.dir-form input{flex:1;min-width:0;margin:0}
+.dir-form .btn{flex:0 0 auto}
+.dir-par{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:14px;color:var(--ink-2)}
+.dir-par input{flex:1;min-width:0;margin:0;min-height:38px;font-size:15px}
+.dir-res{margin-top:8px}
+.dir-conf{display:flex;flex-direction:column;gap:2px;margin-right:22px}
+.dir-conf small{color:var(--ink-2)}
+.seg.busq{margin:4px 0 12px}
+#busDir .dir-form{margin-right:0}
+.marca-dir{position:relative}
+.marca-dir i{position:absolute;left:-11px;top:-11px;width:22px;height:22px;border-radius:50%;background:rgba(37,99,235,.25);border:3px solid #2563eb;box-shadow:0 0 0 6px rgba(37,99,235,.15)}
+.marca-dir span{position:absolute;left:16px;top:-12px;white-space:nowrap;background:#2563eb;color:#fff;font-weight:700;font-size:12px;padding:3px 8px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.25)}
 .empty{padding:20px 4px;text-align:center}
 .empty p{color:var(--ink-2)}
 .leaflet-control-attribution{font-size:10px}
@@ -990,6 +1007,7 @@ body.revisando #fabs, body.revisando #chips{display:none}
 <div id="sheet" role="dialog" aria-modal="false"><div class="grip"></div><div id="sheetBody"></div></div>
 <div id="toast" role="status"></div>
 <div id="banner"><span class="t" id="bannerTxt"></span><button id="bannerBtn"></button></div>
+<div id="dirBox" hidden></div>
 <input type="file" id="fileXlsx" accept=".xlsx,.xls,.csv" hidden>
 <input type="file" id="fileJson" accept=".json,application/json" hidden>
 
@@ -1053,6 +1071,7 @@ const markers = new Map();
 let lastZoomLbl = null;
 map.on('zoomend', ()=>{ const z=map.getZoom()>=15; if(z!==lastZoomLbl){ lastZoomLbl=z; render(); } });
 map.on('click', e => {
+  if(marcaDir && !UI.moving){ quitarMarcaDir(); }
   if(UI.picking){ const f=UI.picking; UI.picking=null; hideBanner(); f(e.latlng); return; }
   if(UI.preview){ setPreviewPoint(e.latlng, null); showPreviewSheet(); return; }
   if(UI.placing){
@@ -1504,7 +1523,12 @@ function openClient(id, tab, quieto){
     if(act==='zona') openZonePicker(c);
     if(act==='baja' && confirm(`¿Ocultar a ${codeOf(c)} ${nomDe(c)} como "No existe más"? Lo podés reactivar desde el menú.`)){ c.baja=true; c.zona=null; queueCampos(c,{estado:'Oculto'}); save(); closeSheet(); render(); toast('Cliente ocultado'); }
     if(act==='alta'){ c.baja=false; queueCampos(c,{estado:'Activo'}); if(located(c)) assignNearestZone(c); save(); render(); openClient(c.id); toast('Cliente reactivado'); }
-    if(act==='move'){ UI.moving=c.id; closeSheet(); render(); showBanner('Arrastrá el pin a su lugar','Listo',()=>{ UI.moving=null; hideBanner(); render(); toast('Ubicación guardada'); }); }
+    if(act==='move'){ UI.moving=c.id; closeSheet(); render();
+      let cerrarBus=null;
+      showBanner('Arrastrá el pin a su lugar','Listo',()=>{ if(cerrarBus) cerrarBus(); UI.moving=null; hideBanner(); render(); toast('Ubicación guardada'); });
+      const bb=document.getElementById('bannerBtn'), bd=document.createElement('button'); bd.id='bannerDir'; bd.className='b2'; bd.textContent='Buscar dirección';
+      bd.onclick=()=>{ cerrarBus=abrirBuscadorPin(c); }; bb.parentNode.insertBefore(bd, bb);
+ }
   };
 }
 function openZonePicker(c){
@@ -3083,8 +3107,81 @@ function renderCob(){
 }
 
 /* ============ Búsqueda ============ */
+/* ---- Buscador de direcciones (calle y altura, o esquina) ---- */
+async function buscarDirecciones(q, partido){
+  q=String(q||'').replace(/\s+/g,' ').trim(); if(!q) return [];
+  // "San Martín y Rivadavia", "San Martín esq. Rivadavia" → esquina
+  const qe=q.replace(/\s+(esq\.?|esquina)\s+/i,' y ');
+  const caba=/ciudad autonoma|capital federal|caba/.test(norm(partido||''));
+  const pedidos=[];
+  if(partido && !caba) pedidos.push({direccion:qe, departamento:partido, provincia:'Buenos Aires', max:5});
+  if(caba || !partido) pedidos.push({direccion:qe, provincia:'Ciudad Autónoma de Buenos Aires', max:3});
+  pedidos.push({direccion:qe, provincia:'Buenos Aires', max:5});
+  const res=[], vistos=new Set();
+  const add=(lat,lng,label,sub)=>{ const k=(+lat).toFixed(5)+','+(+lng).toFixed(5); if(vistos.has(k)) return; vistos.add(k); res.push({lat:+lat,lng:+lng,label,sub}); };
+  try{
+    const r=await fetch(GEOREF,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({direcciones:pedidos})});
+    if(r.ok){ const j=await r.json();
+      (j.resultados||[]).forEach(x=>(x.direcciones||[]).forEach(d=>{ if(!d.ubicacion || d.ubicacion.lat==null) return;
+        const loc=(d.localidad_censal&&d.localidad_censal.nombre)||'', dep=(d.departamento&&d.departamento.nombre)||'';
+        add(d.ubicacion.lat, d.ubicacion.lon, d.nomenclatura||q, [loc,dep].filter((v,i,a)=>v&&a.indexOf(v)===i).join(' · ')); })); }
+  }catch(e){}
+  if(!res.length){
+    try{ const hits=await nominatim([q, partido?('Partido de '+partido):'', 'Buenos Aires'].filter(Boolean).join(', '));
+      hits.forEach(h=>add(h.lat, h.lon, String(h.display_name||'').split(',').slice(0,2).join(','), String(h.display_name||'').split(',').slice(2,4).join(',').trim())); }catch(e){}
+  }
+  return res.slice(0,6);
+}
+let marcaDir=null;
+function mostrarMarcaDir(p, label){
+  quitarMarcaDir();
+  marcaDir=L.marker([p.lat,p.lng],{icon:L.divIcon({className:'',html:`<div class="marca-dir"><i></i><span>${esc(label||'')}</span></div>`,iconSize:[0,0]}),interactive:false,zIndexOffset:2000}).addTo(map);
+  map.setView([p.lat,p.lng], 18);
+}
+function quitarMarcaDir(){ if(marcaDir){ map.removeLayer(marcaDir); marcaDir=null; } }
+// Arma el formulario de búsqueda dentro de "box"; al elegir un resultado llama a onPick(resultado)
+function formDirecciones(box, partido, onPick){
+  box.innerHTML=`<form class="dir-form"><input id="dirQ" type="search" placeholder="Calle y altura, o esquina (San Martín y Rivadavia)" autocomplete="off" enterkeyhint="search">
+    <button class="btn go" type="submit">Buscar</button></form>
+    <div class="dir-par"><label for="dirP">Partido</label><input id="dirP" type="text" value="${esc(partido||'')}" placeholder="Todos"></div>
+    <ul class="list dir-res" id="dirRes"></ul>`;
+  const f=box.querySelector('form'), q=box.querySelector('#dirQ'), pa=box.querySelector('#dirP'), out=box.querySelector('#dirRes');
+  let lista=[];
+  f.onsubmit=async ev=>{ ev.preventDefault(); if(!q.value.trim()) return;
+    out.innerHTML='<li><span class="txt"><small>Buscando…</small></span></li>';
+    lista=await buscarDirecciones(q.value, pa.value.trim());
+    out.innerHTML = lista.length ? lista.map((r,i)=>`<li data-i="${i}" style="--c:#14313a"><span class="num">${i+1}</span><span class="txt"><b>${esc(r.label)}</b><small>${esc(r.sub||'')}</small></span></li>`).join('')
+      : '<li><span class="txt"><small>No se encontró esa dirección. Probá con la esquina más cercana o revisá el partido.</small></span></li>';
+  };
+  out.onclick=e=>{ const li=e.target.closest('li[data-i]'); if(li) onPick(lista[+li.dataset.i]); };
+  setTimeout(()=>q.focus(),250);
+}
+// Buscador dentro de "Mover pin": muestra el punto y pide confirmación antes de mover el pin
+function abrirBuscadorPin(c){
+  const box=document.getElementById('dirBox'); box.hidden=false;
+  const cerrar=()=>{ box.hidden=true; box.innerHTML=''; quitarMarcaDir(); };
+  const armar=()=>{ formDirecciones(box, c.partido||c.localidad||'', r=>{
+      mostrarMarcaDir(r, r.label);
+      box.innerHTML=`<div class="dir-conf"><b>${esc(r.label)}</b><small>${esc(r.sub||'')}</small>
+        <div class="row"><button class="btn go" id="dirOk">Poner el pin acá</button><button class="btn" id="dirOtra">Otra búsqueda</button></div></div>`;
+      document.getElementById('dirOk').onclick=()=>{ c.lat=r.lat; c.lng=r.lng; c.geo='ok'; delete c.geoDudosa; delete c.geoNota; queueCampos(c, geoCampos(c)); save(); render(); cerrar(); toast('Pin movido. Si hace falta, ajustalo arrastrándolo y tocá Listo', 5000); };
+      document.getElementById('dirOtra').onclick=()=>{ quitarMarcaDir(); armar(); };
+    });
+    const x=document.createElement('button'); x.className='dir-x'; x.type='button'; x.setAttribute('aria-label','Cerrar buscador'); x.textContent='×'; x.onclick=cerrar; box.prepend(x);
+  };
+  armar();
+  return cerrar;
+}
+
 function openSearch(){
-  openSheet(`<h2>Buscar cliente</h2><input id="q" type="search" placeholder="Código, nombre, razón social o dirección" autocomplete="off"><ul class="list" id="qres"></ul>`);
+  openSheet(`<h2>Buscar</h2><div class="seg busq" role="tablist"><button type="button" data-b="cli" aria-pressed="true">Clientes</button><button type="button" data-b="dir" aria-pressed="false">Dirección</button></div>
+    <div id="busCli"><input id="q" type="search" placeholder="Código, nombre, razón social o dirección" autocomplete="off"><ul class="list" id="qres"></ul></div><div id="busDir" hidden></div>`);
+  sheetBody.querySelectorAll('[data-b]').forEach(b=>b.addEventListener('click',()=>{
+    const dir=b.dataset.b==='dir'; sheetBody.querySelectorAll('[data-b]').forEach(x=>x.setAttribute('aria-pressed', String(x===b)));
+    document.getElementById('busCli').hidden=dir; document.getElementById('busDir').hidden=!dir;
+    if(dir && !document.getElementById('dirQ')) formDirecciones(document.getElementById('busDir'), '', r=>{ closeSheet(); mostrarMarcaDir(r, r.label); toast('Tocá el mapa para sacar la marca', 3500); });
+    if(!dir) setTimeout(()=>document.getElementById('q').focus(),100);
+  }));
   sheetBody.onclick = e=>{ const li=e.target.closest('li[data-id]'); if(!li) return; const c=S.clients.find(x=>x.id===li.dataset.id); if(c&&located(c)) map.setView([c.lat,c.lng],16); openClient(li.dataset.id); };
   const q = document.getElementById('q'), out = document.getElementById('qres');
   const run = ()=>{ const t=norm(q.value); if(!t){ out.innerHTML=''; return; }
@@ -3147,8 +3244,8 @@ map.on('dragstart', ()=>{ if(follow){ follow=false; updateMeBtn(); } });
 /* ============ Avisos ============ */
 let toastT;
 function toast(t, ms){ const el=document.getElementById('toast'); el.textContent=t; el.style.display='block'; clearTimeout(toastT); toastT=setTimeout(()=>el.style.display='none',ms||2400); }
-function showBanner(text,btn,fn){ const b=document.getElementById('banner'); document.getElementById('bannerTxt').textContent=text; const bb=document.getElementById('bannerBtn'); bb.textContent=btn; bb.onclick=fn; b.style.display='flex'; document.getElementById('fabs').style.display='none'; }
-function hideBanner(){ document.getElementById('banner').style.display='none'; document.getElementById('fabs').style.display='flex'; }
+function showBanner(text,btn,fn){ const ob=document.getElementById('bannerDir'); if(ob) ob.remove(); const b=document.getElementById('banner'); document.getElementById('bannerTxt').textContent=text; const bb=document.getElementById('bannerBtn'); bb.textContent=btn; bb.onclick=fn; b.style.display='flex'; document.getElementById('fabs').style.display='none'; }
+function hideBanner(){ const ob=document.getElementById('bannerDir'); if(ob) ob.remove(); document.getElementById('banner').style.display='none'; document.getElementById('fabs').style.display='flex'; }
 
 /* ============ Inicio ============ */
 load();
