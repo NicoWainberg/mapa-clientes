@@ -44,8 +44,10 @@ function doGet(e) {
     const props = PropertiesService.getScriptProperties();
     if (p.accion === 'todo') return out({ ok: true, clientes: leerClientes(ss), visitas: leerVisitas(ss), reinicio: Number(props.getProperty('reinicio') || 0),
       deudas: leerDeudas(ss), cobradas: leerCobradas(ss), deudasAct: Number(props.getProperty('deudasAct') || 0),
-      productos: leerResumenProductos(ss), prodAct: Number(props.getProperty('prodAct') || 0), prodPend: Number(props.getProperty('prodPend') || 0) });
+      productos: leerResumenProductos(ss), prodAct: Number(props.getProperty('prodAct') || 0), prodPend: Number(props.getProperty('prodPend') || 0),
+      ventas: resumenVentas(ss) });
     if (p.accion === 'actualizarDeudas') return out(actualizarDeudas(ss));
+    if (p.accion === 'actualizarVentas') return out(actualizarVentas(ss));
     if (p.accion === 'registro') return out({ ok: true, filas: leerVisitas(ss) });
     return out({ ok: true, msg: 'Conectado' });
   } catch (err) {
@@ -92,6 +94,7 @@ function doPost(e) {
     let r;
     if (d.tipo === 'alta') r = alta(ss, d);
     else if (d.tipo === 'cobrada') r = marcarCobrada(ss, d);
+    else if (d.tipo === 'objetivo') r = guardarObjetivo(d);
     else if (d.tipo === 'reinicio') { PropertiesService.getScriptProperties().setProperty('reinicio', String(Number(d.ts) || Date.now())); r = { ok: true }; }
     else if (d.tipo === 'lote') r = { ok: true, res: aplicarLote(ss, d.items || []) };
     else if (d.tipo === 'edicion') r = aplicarLote(ss, [{ orig: d.orig, campos: d.campos }])[0];
@@ -440,10 +443,12 @@ function loginSistema() {
   let j = null; try { j = JSON.parse(u.getContentText()); } catch (e) {}
   if (!j || !j.clients) throw new Error('No pude iniciar sesión en el sistema: revisá el usuario y la clave');
   clientesSistema = j.clients;
+  pedidosSistema = j.orders || [];
   return jar;
 }
 
 let clientesSistema = null; // lista de clientes del vendedor que devuelve el sistema al iniciar sesión
+let pedidosSistema = null;  // pedidos de los últimos 30 días (y los sin enviar) que devuelve el sistema
 
 // Completa la columna "Nombre en sistema" con el nombre con que cada cliente está dado de alta en el sistema
 // (se busca por el número de cliente). Corre cada mañana con las deudas; también se puede ejecutar desde el editor.
@@ -480,6 +485,7 @@ function actualizarDeudas(ss) {
   estructura(ss);
   const jar = loginSistema(), ck = textoCookies(jar);
   try { actualizarNombresSistema(ss); } catch (e) { Logger.log('Nombres: ' + e); }
+  try { guardarPedidos(ss); } catch (e) { Logger.log('Ventas: ' + e); }
   const cl = ss.getSheetByName(H_CLIENTES);
   const data = cl.getDataRange().getDisplayValues();
   const head = data[0].map(norm);
@@ -931,4 +937,82 @@ function inflarZlib(bytes) {
     }
   }
   return out;
+}
+
+/* ================= Ventas (pedidos confirmados) ================= */
+// El sistema solo muestra los pedidos de los últimos 30 días, así que cada vez que se consulta se guardan
+// en la hoja Pedidos (oculta) para ir armando el historial. Cuenta solo los pedidos confirmados (enviados),
+// no los que están en edición, y toma el importe neto (sin IVA).
+const H_PEDIDOS = 'Pedidos';
+const COLS_PEDIDOS = ['ID', 'Fecha', 'Hora', 'Código', 'Cliente', 'Neto sin IVA'];
+const TZ_AR = 'America/Argentina/Buenos_Aires';
+
+function hojaPedidos(ss) {
+  let sh = ss.getSheetByName(H_PEDIDOS);
+  if (!sh) {
+    sh = ss.insertSheet(H_PEDIDOS, ss.getSheets().length);
+    sh.getRange('A:E').setNumberFormat('@');
+    sh.getRange('F:F').setNumberFormat('"$"#,##0.00');
+    sh.getRange(1, 1, 1, COLS_PEDIDOS.length).setValues([COLS_PEDIDOS]).setFontWeight('bold').setBackground('#14313a').setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+    sh.hideSheet();
+  }
+  return sh;
+}
+
+function guardarPedidos(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  if (!pedidosSistema) loginSistema();
+  const props = PropertiesService.getScriptProperties();
+  const hoy = Utilities.formatDate(new Date(), TZ_AR, 'yyyy-MM-dd');
+  if (!props.getProperty('ventasDesde')) { // desde cuándo hay datos completos (el sistema muestra 30 días)
+    const d = new Date(); d.setDate(d.getDate() - 29);
+    props.setProperty('ventasDesde', Utilities.formatDate(d, TZ_AR, 'yyyy-MM-dd'));
+  }
+  const nombres = {}; (clientesSistema || []).forEach(c => { nombres[String(c.id)] = c.name || c.razonSocial || ''; });
+  const sh = hojaPedidos(ss);
+  const n = sh.getLastRow() - 1;
+  const filas = n > 0 ? sh.getRange(2, 1, n, COLS_PEDIDOS.length).getValues() : [];
+  const pos = {}; filas.forEach((f, i) => { pos[String(f[0])] = i; });
+  let nuevos = 0;
+  (pedidosSistema || []).filter(o => Number(o.closed) === 1).forEach(o => {
+    const d = new Date(String(o.date).replace(/([+-]\d{2})(\d{2})$/, '$1:$2'));
+    if (isNaN(d)) return;
+    const neto = Math.round(((Number(o.netAmount) || 0) - (Number(o.discountAmount) || 0)) * 100) / 100;
+    const fila = [String(o.id), Utilities.formatDate(d, TZ_AR, 'yyyy-MM-dd'), Utilities.formatDate(d, TZ_AR, 'HH:mm'), String(o.client), nombres[String(o.client)] || '', neto];
+    if (pos[fila[0]] != null) filas[pos[fila[0]]] = fila; else { pos[fila[0]] = filas.length; filas.push(fila); nuevos++; }
+  });
+  filas.sort((a, b) => String(a[1] + a[2]).localeCompare(String(b[1] + b[2])));
+  if (filas.length) sh.getRange(2, 1, filas.length, COLS_PEDIDOS.length).setValues(filas);
+  props.setProperty('ventasAct', String(Date.now()));
+  return nuevos;
+}
+
+function actualizarVentas(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  loginSistema();
+  guardarPedidos(ss);
+  return { ok: true, ventas: resumenVentas(ss) };
+}
+
+// Total vendido por día, para que la app calcule el mes, el promedio y la comparación
+function resumenVentas(ss) {
+  const props = PropertiesService.getScriptProperties();
+  const sh = ss.getSheetByName(H_PEDIDOS), dias = {};
+  if (sh && sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, COLS_PEDIDOS.length).getValues().forEach(f => {
+    const k = f[1] instanceof Date ? Utilities.formatDate(f[1], TZ_AR, 'yyyy-MM-dd') : String(f[1]);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(k)) dias[k] = Math.round(((dias[k] || 0) + (Number(f[5]) || 0)) * 100) / 100;
+  });
+  let obj = {}; try { obj = JSON.parse(props.getProperty('objetivos') || '{}'); } catch (e) {}
+  return { dias: dias, desde: props.getProperty('ventasDesde') || '', act: Number(props.getProperty('ventasAct') || 0), objetivos: obj };
+}
+
+function guardarObjetivo(d) {
+  const props = PropertiesService.getScriptProperties();
+  let obj = {}; try { obj = JSON.parse(props.getProperty('objetivos') || '{}'); } catch (e) {}
+  if (!/^\d{4}-\d{2}$/.test(String(d.mes || ''))) return { ok: false, error: 'Mes inválido' };
+  const v = Number(d.valor) || 0;
+  if (v > 0) obj[d.mes] = v; else delete obj[d.mes];
+  props.setProperty('objetivos', JSON.stringify(obj));
+  return { ok: true };
 }

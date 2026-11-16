@@ -853,7 +853,23 @@ input:focus,textarea:focus,button:focus-visible{outline:3px solid var(--sel);out
 #navBadge{position:absolute;top:5px;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#c62828;color:#fff;font-size:11px;line-height:18px;text-align:center}
 #navBadge[hidden]{display:none}
 .leaflet-bottom{margin-bottom:calc(58px + var(--safe-b))}
-body.vista-cob #top, body.vista-cob #fabs{display:none}
+body.vista-cob #top, body.vista-cob #fabs, body.vista-ventas #top, body.vista-ventas #fabs{display:none}
+#ventasView{display:none;position:fixed;left:0;right:0;top:0;bottom:calc(58px + var(--safe-b));z-index:520;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(var(--safe-t) + 14px) 16px 24px}
+body.vista-ventas #ventasView{display:block}
+.vt-card{background:var(--card);border-radius:16px;padding:16px;margin-top:12px}
+.vt-card small{display:block;color:var(--ink-2);font-size:13px}
+.vt-card b.big{display:block;font-family:var(--cond);font-size:34px;line-height:1.15;margin-top:2px}
+.vt-card .vt-sub{font-size:14px;color:var(--ink-2);margin-top:2px}
+.vt-total{background:#14313a;color:#fff}
+.vt-total small,.vt-total .vt-sub{color:rgba(255,255,255,.8)}
+.vt-cmp{font-weight:700}
+.vt-cmp.up{color:#1f9d55}.vt-cmp.down{color:#c0392b}
+.vt-bar{height:10px;border-radius:6px;background:var(--line);overflow:hidden;margin:10px 0 6px}
+.vt-bar i{display:block;height:100%;background:#1f9d55;border-radius:6px}
+.vt-meses{list-style:none;margin:6px 0 0;padding:0}
+.vt-meses li{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:15px}
+.vt-meses li:last-child{border-bottom:0}
+.vt-meses li span{color:var(--ink-2)}
 /* Colores de cobranzas */
 :root{--venc:#cf3b3b;--pv:#e79a12;--okd:#a7b8c0}
 .s-venc{background:var(--venc)} .s-pv{background:var(--pv)} .s-ok{background:var(--okd)}
@@ -998,9 +1014,10 @@ body.revisando #fabs, body.revisando #chips{display:none}
 </div>
 
 <div id="cobView" aria-label="Cobranzas"></div>
+<div id="ventasView" aria-label="Ventas"></div>
 <div id="revBar" hidden></div>
 <div id="avisoZona" hidden></div>
-<nav id="nav"><button data-v="mapa" aria-current="page"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><line x1="9" y1="4" x2="9" y2="17.5"/><line x1="15" y1="6.5" x2="15" y2="20"/></svg><span>Mapa</span></button><button data-v="cob" aria-current="false"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><line x1="6" y1="9.5" x2="6" y2="14.5"/><line x1="18" y1="9.5" x2="18" y2="14.5"/></svg><span>Cobranzas</span><b id="navBadge" hidden>0</b></button></nav>
+<nav id="nav"><button data-v="mapa" aria-current="page"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><line x1="9" y1="4" x2="9" y2="17.5"/><line x1="15" y1="6.5" x2="15" y2="20"/></svg><span>Mapa</span></button><button data-v="cob" aria-current="false"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><line x1="6" y1="9.5" x2="6" y2="14.5"/><line x1="18" y1="9.5" x2="18" y2="14.5"/></svg><span>Cobranzas</span><b id="navBadge" hidden>0</b></button><button data-v="ventas"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg><span>Ventas</span></button></nav>
 <div id="fabs">
   <button class="fab" id="btnNorth" aria-label="Volver a orientar al norte"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2 L18 13 L13 11 L8 13 Z" fill="#e23d4f"/><path d="M13 24 L8 13 L13 15 L18 13 Z" fill="#9aa7ab"/></svg></button>
   <button class="fab" id="btnMe" aria-label="Mi ubicación"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/><line x1="12" y1="1.5" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="22.5" y2="12"/></svg></button>
@@ -1653,6 +1670,7 @@ function openMenu(){
     ${bajas?`<button data-m="bajas">Clientes ocultos <small>${bajas}</small></button>`:''}
     ${watchId!=null?'<button data-m="stoptrack">Dejar de seguir mi ubicación</button>':''}
     <button data-m="visited">${S.showVisited?'Ocultar':'Mostrar'} visitados</button>
+    <button data-m="objetivo">Objetivo de ventas del mes <small>${(()=>{ const n=new Date(), o=objetivoDe(n.getFullYear(),n.getMonth()); return o?plata(o):'sin cargar'; })()}</small></button>
     <button data-m="cobmin">Cobranzas: deuda mínima a mostrar <small>${plata(minimoCob())}</small></button>
     <button data-m="ruta">Ruta y horarios <small>${cfgRuta().casa?'casa cargada':'cargar mi casa'}</small></button>
     <button data-m="zones">Recalcular días <small>${S.minZona||8} a ${S.maxZona||12} clientes por día</small></button>
@@ -1677,6 +1695,21 @@ function openMenu(){
     if(m==='visited'){ S.showVisited=!S.showVisited; save(); render(); openMenu(); }
     if(m==='zones') openZoneForm();
     if(m==='ruta') openAjustesRuta();
+    if(m==='objetivo'){
+      const n=new Date(), mk=mesKey(n.getFullYear(),n.getMonth()), o=objetivoDe(n.getFullYear(),n.getMonth());
+      openSheet(`<h2>Objetivo de ventas</h2><p class="sub">Para ${n.toLocaleDateString('es-AR',{month:'long',year:'numeric'})}, sin IVA. Sigue valiendo para los meses siguientes hasta que lo cambies. Dejalo vacío para sacarlo.</p>
+        <label for="vobj">Objetivo ($)</label><input id="vobj" type="number" inputmode="numeric" min="0" step="100000" value="${o||''}">
+        <div class="row"><button class="btn go" id="vobjOk">Guardar</button><button class="btn" id="vobjNo">Cancelar</button></div>`);
+      document.getElementById('vobjOk').onclick=async()=>{
+        const v=parseInt(document.getElementById('vobj').value,10)||0;
+        S.ventas=S.ventas||{dias:{},objetivos:{}}; S.ventas.objetivos=S.ventas.objetivos||{};
+        if(v>0) S.ventas.objetivos[mk]=v; else delete S.ventas.objetivos[mk];
+        save(); renderVentas();
+        if(S.scriptUrl){ try{ const r=await postScript({tipo:'objetivo', mes:mk, valor:v}); toast(r.ok?'Objetivo guardado':'No se pudo guardar en la planilla'); }catch(e){ toast('Guardado en este equipo. Sin conexión con la planilla.'); } }
+        else toast('Objetivo guardado');
+        openMenu(); };
+      document.getElementById('vobjNo').onclick=()=>openMenu();
+    }
     if(m==='cobmin'){
       openSheet(`<h2>Deuda mínima a mostrar</h2><p class="sub">En Cobranzas no aparecen los clientes que deben menos que este monto.</p>
         <label for="cmin">Monto mínimo ($)</label><input id="cmin" type="number" inputmode="numeric" min="0" step="1000" value="${minimoCob()}">
@@ -2175,6 +2208,7 @@ async function leerDesdeScript(silent){
     const pendR = (S.outbox||[]).some(o=>o.tipo==='reinicio');
     if(!pendR && j.reinicio!=null) S.reinicio = Math.max(Number(j.reinicio)||0, 0);
     if(j.productos){ S.productos=j.productos; S.prodAct=Number(j.prodAct)||0; }
+    if(j.ventas){ S.ventas=j.ventas; renderVentas(); }
     if(j.deudas){
       S.deudas=j.deudas; S.deudasAct=Number(j.deudasAct)||0;
       const cb={}; (j.cobradas||[]).forEach(x=>{ cb[norm(String(x.codigo).trim())+'|'+x.numero]=x.marcada; });
@@ -3044,10 +3078,79 @@ function marcarCobrada(c, numero, valor){
 function cambiarVista(v){
   UI.vista=v;
   document.body.classList.toggle('vista-cob', v==='cob');
+  document.body.classList.toggle('vista-ventas', v==='ventas');
   document.querySelectorAll('#nav button').forEach(b=>b.setAttribute('aria-current', b.dataset.v===v ? 'page' : 'false'));
   if(v==='cob'){ closeSheet(); renderCob(); }
+  else if(v==='ventas'){ closeSheet(); renderVentas(); if(!S.ventas || Date.now()-(S.ventas.act||0)>10*60*1000) actualizarVentasAhora(true); }
   else setTimeout(()=>map.invalidateSize(), 50);
 }
+/* ============ Ventas del mes (pedidos confirmados, sin IVA) ============ */
+// Feriados nacionales y días no laborables con fines turísticos (fechas en que se cumplen)
+const FERIADOS=['2026-01-01','2026-02-16','2026-02-17','2026-03-23','2026-03-24','2026-04-02','2026-04-03','2026-05-01','2026-05-25','2026-06-15','2026-06-20','2026-07-09','2026-07-10','2026-08-17','2026-10-12','2026-11-23','2026-12-07','2026-12-08','2026-12-25',
+  '2027-01-01','2027-02-08','2027-02-09','2027-03-24','2027-03-26','2027-04-02','2027-05-01','2027-05-25','2027-06-20','2027-07-09','2027-12-08','2027-12-25'];
+function isoDia(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function esHabil(d){ const w=d.getDay(); return w>0 && w<6 && FERIADOS.indexOf(isoDia(d))<0; }
+function habilesEntre(y,m,d1,d2){ let n=0; for(let d=d1; d<=d2; d++){ if(esHabil(new Date(y,m,d))) n++; } return n; }
+function mesKey(y,m){ return y+'-'+String(m+1).padStart(2,'0'); }
+function totalVentas(y,m,hastaDia){ const dias=(S.ventas&&S.ventas.dias)||{}, pre=mesKey(y,m)+'-'; let t=0;
+  Object.keys(dias).forEach(k=>{ if(k.startsWith(pre) && +k.slice(8)<=hastaDia) t+=dias[k]; }); return t; }
+function objetivoDe(y,m){ const o=(S.ventas&&S.ventas.objetivos)||{}, k=mesKey(y,m); if(o[k]) return o[k];
+  const prev=Object.keys(o).filter(x=>x<k).sort().pop(); return prev?o[prev]:0; }
+let actualizandoVentas=false;
+async function actualizarVentasAhora(silencioso){
+  if(!S.scriptUrl){ if(!silencioso) toast('Conectá la planilla en Ajustes'); return; }
+  if(actualizandoVentas) return; actualizandoVentas=true; renderVentas();
+  try{ const j=await (await fetch(S.scriptUrl+(S.scriptUrl.includes('?')?'&':'?')+'accion=actualizarVentas',{cache:'no-store'})).json();
+    if(j.ok && j.ventas){ S.ventas=j.ventas; save(); if(!silencioso) toast('Ventas actualizadas'); }
+    else if(!silencioso) toast(j.error||'No se pudieron traer las ventas', 6000);
+  }catch(e){ if(!silencioso) toast('Sin conexión con la planilla'); }
+  actualizandoVentas=false; renderVentas();
+}
+function renderVentas(){
+  if(UI.vista!=='ventas') return;
+  const box=document.getElementById('ventasView');
+  const hoy=new Date(), y=hoy.getFullYear(), m=hoy.getMonth(), d=hoy.getDate();
+  const nombreMes=hoy.toLocaleDateString('es-AR',{month:'long'}); const Mes=nombreMes.charAt(0).toUpperCase()+nombreMes.slice(1);
+  const ultimo=new Date(y,m+1,0).getDate();
+  const habT=habilesEntre(y,m,1,d), habMes=habilesEntre(y,m,1,ultimo);
+  const act=S.ventas&&S.ventas.act ? new Date(S.ventas.act).toLocaleString('es-AR',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+  let h=`<div class="cob-head"><div><h2>Ventas</h2><small>${act?'Actualizado '+act:'Sin datos todavía'}</small></div>
+    <button class="ibtn dark" id="vtAct" aria-label="Actualizar ventas" ${actualizandoVentas?'disabled':''}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="${actualizandoVentas?'gira':''}"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><polyline points="20 4 20 9 15 9"/></svg></button></div>`;
+  if(!S.ventas){
+    h+=`<div class="cob-vacio"><p>${actualizandoVentas?'Trayendo las ventas del sistema…':'Todavía no se trajeron las ventas del sistema.'}</p><p class="hint">Se cuentan los pedidos confirmados (no los que están en edición), sin IVA.</p></div>`;
+  } else {
+    const total=totalVentas(y,m,d), prom=habT?total/habT:0;
+    h+=`<div class="vt-card vt-total"><small>${Mes} · vendido</small><b class="big">${plata(total)}</b>
+      <div class="vt-sub">Promedio diario <b>${plata(prom)}</b> · ${habT} de ${habMes} días hábiles</div></div>`;
+    // comparación con el mismo día del mes anterior
+    const pm=m===0?11:m-1, py=m===0?y-1:y, ultPm=new Date(py,pm+1,0).getDate(), dPm=Math.min(d,ultPm);
+    const desde=S.ventas.desde||'', cubre=desde && desde<=mesKey(py,pm)+'-01';
+    if(cubre){
+      const ant=totalVentas(py,pm,dPm), dif=ant?Math.round((total-ant)/ant*100):null;
+      const nPm=new Date(py,pm,1).toLocaleDateString('es-AR',{month:'long'});
+      h+=`<div class="vt-card"><small>Al ${dPm} de ${nPm}</small><b class="big">${plata(ant)}</b>
+        ${dif!=null?`<div class="vt-sub"><span class="vt-cmp ${dif>=0?'up':'down'}">${dif>=0?'▲ +'+dif:'▼ '+Math.abs(dif)}%</span> este mes respecto del anterior</div>`:''}</div>`;
+    } else {
+      h+=`<div class="vt-card"><small>Comparación con el mes anterior</small><div class="vt-sub">El sistema solo muestra los pedidos de los últimos 30 días, así que la app va guardando el historial. La comparación aparece cuando haya un mes anterior completo${desde?` (datos desde el ${new Date(desde+'T12:00:00').toLocaleDateString('es-AR')})`:''}.</div></div>`;
+    }
+    const obj=objetivoDe(y,m);
+    if(obj>0){
+      const falta=Math.max(obj-total,0), restan=habilesEntre(y,m,d+1,ultimo), pct=Math.min(100,Math.round(total/obj*100));
+      h+=`<div class="vt-card"><small>Objetivo de ${nombreMes}</small><b class="big">${plata(obj)}</b>
+        <div class="vt-bar"><i style="width:${pct}%"></i></div>
+        <div class="vt-sub">${falta>0?`Llevás el ${pct}% · faltan <b>${plata(falta)}</b>${restan?` · <b>${plata(falta/restan)}</b> por día en los ${restan} días hábiles que quedan`:''}`:'<b>¡Objetivo cumplido!</b>'}</div></div>`;
+    }
+    // meses anteriores guardados
+    const meses={}; Object.keys(S.ventas.dias||{}).forEach(k=>{ const mk=k.slice(0,7); if(mk<mesKey(y,m) && (!desde || desde<=mk+'-01')) meses[mk]=(meses[mk]||0)+S.ventas.dias[k]; });
+    const ks=Object.keys(meses).sort().reverse().slice(0,6);
+    if(ks.length) h+=`<h3 style="margin-top:18px">Meses anteriores</h3><ul class="vt-meses vt-card">${ks.map(k=>{ const [yy,mm]=k.split('-').map(Number);
+      return `<li><span>${new Date(yy,mm-1,1).toLocaleDateString('es-AR',{month:'long',year:'numeric'})}</span><b>${plata(meses[k])}</b></li>`; }).join('')}</ul>`;
+    h+=`<p class="hint" style="margin-top:14px">Pedidos confirmados, sin IVA. Días hábiles: lunes a viernes sin feriados. El objetivo se carga en Ajustes.</p>`;
+  }
+  box.innerHTML=h;
+  const b=document.getElementById('vtAct'); if(b) b.onclick=()=>actualizarVentasAhora(false);
+}
+
 function renderNavBadge(){
   const min=minimoCob(); const n=S.clients.filter(c=>active(c)).map(deudaNeta).filter(d=>d && d.saldo>=min && d.saldo>0 && (d.venc>0 || d.pv>0)).length;
   const b=document.getElementById('navBadge'); if(!b) return;
