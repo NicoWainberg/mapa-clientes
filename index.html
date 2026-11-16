@@ -834,6 +834,9 @@ input:focus,textarea:focus,button:focus-visible{outline:3px solid var(--sel);out
 .dir-conf small{color:var(--ink-2)}
 .seg.busq{margin:4px 0 12px}
 #busDir .dir-form{margin-right:0}
+.marca-num{position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+.dir-res li.sel{background:rgba(37,99,235,.10)}
+.dir-res{max-height:32vh;overflow-y:auto}
 .marca-dir{position:relative}
 .marca-dir i{position:absolute;left:-11px;top:-11px;width:22px;height:22px;border-radius:50%;background:rgba(37,99,235,.25);border:3px solid #2563eb;box-shadow:0 0 0 6px rgba(37,99,235,.15)}
 .marca-dir span{position:absolute;left:16px;top:-12px;white-space:nowrap;background:#2563eb;color:#fff;font-weight:700;font-size:12px;padding:3px 8px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.25)}
@@ -3138,9 +3141,21 @@ function mostrarMarcaDir(p, label){
   marcaDir=L.marker([p.lat,p.lng],{icon:L.divIcon({className:'',html:`<div class="marca-dir"><i></i><span>${esc(label||'')}</span></div>`,iconSize:[0,0]}),interactive:false,zIndexOffset:2000}).addTo(map);
   map.setView([p.lat,p.lng], 18);
 }
-function quitarMarcaDir(){ if(marcaDir){ map.removeLayer(marcaDir); marcaDir=null; } }
+function quitarMarcaDir(){ if(marcaDir){ map.removeLayer(marcaDir); marcaDir=null; } quitarResultadosDir(); }
+// Todos los resultados numerados en el mapa a la vez
+let capaResDir=null;
+function quitarResultadosDir(){ if(capaResDir){ map.removeLayer(capaResDir); capaResDir=null; } }
+function mostrarResultadosDir(lista, onPick){
+  quitarResultadosDir(); if(!lista.length) return;
+  capaResDir=L.layerGroup().addTo(map);
+  lista.forEach((r,i)=>{ const m=L.marker([r.lat,r.lng],{icon:L.divIcon({className:'',html:`<div class="marca-num">${i+1}</div>`,iconSize:[0,0]}),zIndexOffset:1900}).addTo(capaResDir);
+    m.on('click',()=>onPick(r,i)); });
+  const box=document.getElementById('dirBox'), top=box && !box.hidden ? box.getBoundingClientRect().bottom+20 : 80;
+  if(lista.length===1) map.setView([lista[0].lat,lista[0].lng],17);
+  else map.fitBounds(L.latLngBounds(lista.map(r=>[r.lat,r.lng])),{paddingTopLeft:[40,top],paddingBottomRight:[40,140],maxZoom:17});
+}
 // Arma el formulario de búsqueda dentro de "box"; al elegir un resultado llama a onPick(resultado)
-function formDirecciones(box, partido, onPick){
+function formDirecciones(box, partido, onPick, onResults){
   box.innerHTML=`<form class="dir-form"><input id="dirQ" type="search" placeholder="Calle y altura, o esquina (San Martín y Rivadavia)" autocomplete="off" enterkeyhint="search">
     <button class="btn go" type="submit">Buscar</button></form>
     <div class="dir-par"><label for="dirP">Partido</label><input id="dirP" type="text" value="${esc(partido||'')}" placeholder="Todos"></div>
@@ -3150,23 +3165,34 @@ function formDirecciones(box, partido, onPick){
   f.onsubmit=async ev=>{ ev.preventDefault(); if(!q.value.trim()) return;
     out.innerHTML='<li><span class="txt"><small>Buscando…</small></span></li>';
     lista=await buscarDirecciones(q.value, pa.value.trim());
-    out.innerHTML = lista.length ? lista.map((r,i)=>`<li data-i="${i}" style="--c:#14313a"><span class="num">${i+1}</span><span class="txt"><b>${esc(r.label)}</b><small>${esc(r.sub||'')}</small></span></li>`).join('')
+    out.innerHTML = lista.length ? lista.map((r,i)=>`<li data-i="${i}" style="--c:#2563eb"><span class="num">${i+1}</span><span class="txt"><b>${esc(r.label)}</b><small>${esc(r.sub||'')}</small></span></li>`).join('')
       : '<li><span class="txt"><small>No se encontró esa dirección. Probá con la esquina más cercana o revisá el partido.</small></span></li>';
+    if(onResults) onResults(lista);
   };
-  out.onclick=e=>{ const li=e.target.closest('li[data-i]'); if(li) onPick(lista[+li.dataset.i]); };
+  out.onclick=e=>{ const li=e.target.closest('li[data-i]'); if(li) onPick(lista[+li.dataset.i], +li.dataset.i); };
   setTimeout(()=>q.focus(),250);
+}
+// Buscador de la lupa: panel arriba del mapa; los resultados aparecen todos numerados en el mapa
+function abrirBuscadorLupa(){
+  const box=document.getElementById('dirBox'); box.hidden=false;
+  const cerrar=()=>{ box.hidden=true; box.innerHTML=''; quitarMarcaDir(); };
+  const elegir=(r,i)=>{ map.setView([r.lat,r.lng],18);
+    box.querySelectorAll('#dirRes li[data-i]').forEach(li=>li.classList.toggle('sel', +li.dataset.i===i)); };
+  formDirecciones(box, '', elegir, lista=>mostrarResultadosDir(lista, elegir));
+  const x=document.createElement('button'); x.className='dir-x'; x.type='button'; x.setAttribute('aria-label','Cerrar buscador'); x.textContent='×'; x.onclick=cerrar; box.prepend(x);
 }
 // Buscador dentro de "Mover pin": muestra el punto y pide confirmación antes de mover el pin
 function abrirBuscadorPin(c){
   const box=document.getElementById('dirBox'); box.hidden=false;
   const cerrar=()=>{ box.hidden=true; box.innerHTML=''; quitarMarcaDir(); };
-  const armar=()=>{ formDirecciones(box, c.partido||c.localidad||'', r=>{
-      mostrarMarcaDir(r, r.label);
+  const armar=()=>{ const elegir=r=>{
+      quitarResultadosDir(); mostrarMarcaDir(r, r.label);
       box.innerHTML=`<div class="dir-conf"><b>${esc(r.label)}</b><small>${esc(r.sub||'')}</small>
         <div class="row"><button class="btn go" id="dirOk">Poner el pin acá</button><button class="btn" id="dirOtra">Otra búsqueda</button></div></div>`;
       document.getElementById('dirOk').onclick=()=>{ c.lat=r.lat; c.lng=r.lng; c.geo='ok'; delete c.geoDudosa; delete c.geoNota; queueCampos(c, geoCampos(c)); save(); render(); cerrar(); toast('Pin movido. Si hace falta, ajustalo arrastrándolo y tocá Listo', 5000); };
       document.getElementById('dirOtra').onclick=()=>{ quitarMarcaDir(); armar(); };
-    });
+    };
+    formDirecciones(box, c.partido||c.localidad||'', elegir, lista=>mostrarResultadosDir(lista, elegir));
     const x=document.createElement('button'); x.className='dir-x'; x.type='button'; x.setAttribute('aria-label','Cerrar buscador'); x.textContent='×'; x.onclick=cerrar; box.prepend(x);
   };
   armar();
@@ -3179,7 +3205,7 @@ function openSearch(){
   sheetBody.querySelectorAll('[data-b]').forEach(b=>b.addEventListener('click',()=>{
     const dir=b.dataset.b==='dir'; sheetBody.querySelectorAll('[data-b]').forEach(x=>x.setAttribute('aria-pressed', String(x===b)));
     document.getElementById('busCli').hidden=dir; document.getElementById('busDir').hidden=!dir;
-    if(dir && !document.getElementById('dirQ')) formDirecciones(document.getElementById('busDir'), '', r=>{ closeSheet(); mostrarMarcaDir(r, r.label); toast('Tocá el mapa para sacar la marca', 3500); });
+    if(dir){ closeSheet(); abrirBuscadorLupa(); return; }
     if(!dir) setTimeout(()=>document.getElementById('q').focus(),100);
   }));
   sheetBody.onclick = e=>{ const li=e.target.closest('li[data-id]'); if(!li) return; const c=S.clients.find(x=>x.id===li.dataset.id); if(c&&located(c)) map.setView([c.lat,c.lng],16); openClient(li.dataset.id); };
