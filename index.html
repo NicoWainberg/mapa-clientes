@@ -1209,7 +1209,7 @@ function conZonaDelDia(c, seguir){
   if(zd==null || zd===c.zona){ seguir(); return; }
   const zc=c.zona;
   openSheet(`<h2>¿Agregar al Día ${zd+1}?</h2>
-    <p class="sub"><b>${esc(codeOf(c))} ${esc(c.nombre||'')}</b> es del Día ${zc+1}, y hoy venís haciendo el Día ${zd+1}. Si lo agregás, queda en el Día ${zd+1} para los próximos meses.</p>
+    <p class="sub"><b>${esc(codeOf(c))} ${esc(nomDe(c))}</b> es del Día ${zc+1}, y hoy venís haciendo el Día ${zd+1}. Si lo agregás, queda en el Día ${zd+1} para los próximos meses.</p>
     <div class="row"><button class="btn go" id="zdSi">Sí, pasarlo al Día ${zd+1}</button><button class="btn" id="zdNo">No, dejarlo en el Día ${zc+1}</button></div>
     <div class="row" style="justify-content:center"><button class="btn small linkish" id="zdCambio">Hoy hago el Día ${zc+1}</button></div>`);
   sheetBody.onclick=null;
@@ -1220,7 +1220,7 @@ function conZonaDelDia(c, seguir){
     const otros=visitadosDia(inicioDia()).filter(o=>o!==c && o.zona!==zc);
     if(!otros.length){ seguir(); return; }
     openSheet(`<h2>Hoy hacés el Día ${zc+1}</h2>
-      <p class="sub">Hoy ya visitaste ${otros.length===1?'un cliente':otros.length+' clientes'} de otro día: ${otros.map(o=>'<b>'+esc(codeOf(o)+' '+(o.nombre||''))+'</b> (Día '+(o.zona+1)+')').join(', ')}. ¿${otros.length===1?'Lo':'Los'} pasamos al Día ${zc+1}?</p>
+      <p class="sub">Hoy ya visitaste ${otros.length===1?'un cliente':otros.length+' clientes'} de otro día: ${otros.map(o=>'<b>'+esc(codeOf(o)+' '+nomDe(o))+'</b> (Día '+(o.zona+1)+')').join(', ')}. ¿${otros.length===1?'Lo':'Los'} pasamos al Día ${zc+1}?</p>
       <div class="row"><button class="btn go" id="zdSi2">Sí, pasar${otros.length===1?'lo':'los'}</button><button class="btn" id="zdNo2">No</button></div>`);
     sheetBody.onclick=null;
     document.getElementById('zdSi2').onclick=()=>{ otros.forEach(o=>moverDeZona(o, zc)); save(); scheduleFlush(); seguir(); };
@@ -1242,7 +1242,7 @@ function revisarDiaAnterior(){
   UI.avisoZona={dia, z:zd, ids:sob.map(c=>c.id)};
   const el=document.getElementById('avisoZona');
   const cuando = (hoyIni-inicioDia(new Date(ult)))===86400000 ? 'Ayer' : 'El '+new Date(ult).toLocaleDateString('es-AR',{weekday:'long'});
-  el.innerHTML=`<p>${cuando} te ${sob.length===1?'quedó 1 cliente':'quedaron '+sob.length+' clientes'} sin visitar del Día ${zd+1}: ${sob.slice(0,4).map(c=>esc(c.nombre||codeOf(c))).join(', ')}${sob.length>4?' y '+(sob.length-4)+' más':''}.</p>
+  el.innerHTML=`<p>${cuando} te ${sob.length===1?'quedó 1 cliente':'quedaron '+sob.length+' clientes'} sin visitar del Día ${zd+1}: ${sob.slice(0,4).map(c=>esc(nomDe(c)||codeOf(c))).join(', ')}${sob.length>4?' y '+(sob.length-4)+' más':''}.</p>
     <div class="az-acc"><button class="btn go" id="azMudar">Mudarlos a la zona más cercana</button><button class="btn" id="azDejar">Dejarlos en el Día ${zd+1}</button></div>`;
   el.hidden=false;
   document.getElementById('azMudar').onclick=()=>mudarSobrantes(false);
@@ -1255,8 +1255,8 @@ function mudarSobrantes(auto){
   const MAX=S.maxZona||12, msg=[], avisos=[];
   a.ids.forEach(id=>{ const c=S.clients.find(x=>x.id===id); if(!c || c.zona!==a.z || isVisited(c)) return;
     const z=zonasCercanas(c, a.z, MAX)[0]; if(z==null) return;
-    moverDeZona(c, z); msg.push(`${c.nombre||codeOf(c)} → Día ${z+1}`);
-    if(miembrosZona(z).filter(o=>o!==c).every(isVisited)) avisos.push(`${c.nombre||codeOf(c)} quedó pendiente este mes en el Día ${z+1}, que ya hiciste`);
+    moverDeZona(c, z); msg.push(`${nomDe(c)||codeOf(c)} → Día ${z+1}`);
+    if(miembrosZona(z).filter(o=>o!==c).every(isVisited)) avisos.push(`${nomDe(c)||codeOf(c)} quedó pendiente este mes en el Día ${z+1}, que ya hiciste`);
   });
   compactarZonasChicas(true);
   save(); scheduleFlush(); render();
@@ -1279,6 +1279,14 @@ function compactarZonasChicas(silencio){
 
 
 /* ---- Cola de cambios de estado hacia la planilla ---- */
+// Nombre principal: el del sistema (por número de cliente); si no está, el de la planilla
+function nomDe(c){ return (c && (c.nombreSis||c.nombre)) || ''; }
+// Segunda línea de la ficha: el nombre de la planilla si es distinto; si no, la razón social
+function subNombre(c){
+  const p=nomDe(c);
+  if(c.nombreSis && c.nombre && norm(c.nombre)!==norm(c.nombreSis)) return c.nombre;
+  return c.razon && norm(c.razon)!==norm(p) ? c.razon : '';
+}
 function origOf(c){ return {codigo:c.codigo||'', nombre:c.nombre||'', direccion:c.direccion||'', localidad:c.localidad||''}; }
 function geoCampos(c){ return located(c) ? {lat:c.lat.toFixed(6), lng:c.lng.toFixed(6)} : {lat:'', lng:''}; }
 function zonaCampo(c){ return {zona: c.zona!=null ? String(c.zona+1) : ''}; }
@@ -1359,12 +1367,12 @@ function render(){
     const col = v ? '#9aa7ab' : zoneColor(c.zona);
     const html = dim
       ? `<div class="${cls}" style="--c:${col}"><span></span></div>`
-      : `<div class="pw"><div class="${cls}" style="--c:${col}"><span>${label}</span></div>${(d=>d&&d.vencido>0&&d.saldoNeto>=minimoCob())(deudaDe(c))?'<i class="dbt" title="Deuda vencida"></i>':''}${c.geoDudosa?'<i class="dud" title="Ubicación a revisar">?</i>':''}${showLbl?`<div class="lbl" style="--c:${col}"><b style="color:${col}">${esc(codeOf(c))}</b>${esc(c.nombre||'')}</div>`:''}</div>`;
+      : `<div class="pw"><div class="${cls}" style="--c:${col}"><span>${label}</span></div>${(d=>d&&d.vencido>0&&d.saldoNeto>=minimoCob())(deudaDe(c))?'<i class="dbt" title="Deuda vencida"></i>':''}${c.geoDudosa?'<i class="dud" title="Ubicación a revisar">?</i>':''}${showLbl?`<div class="lbl" style="--c:${col}"><b style="color:${col}">${esc(codeOf(c))}</b>${esc(nomDe(c))}</div>`:''}</div>`;
     const icon = L.divIcon({className:'', html, iconSize: dim?[14,14]:[30,30], iconAnchor: dim?[7,7]:[4,30]});
     // Separar pines con la misma dirección
     const key = c.lat.toFixed(5)+','+c.lng.toFixed(5); const n = seen.get(key)||0; seen.set(key,n+1);
     const ll = n ? [c.lat+Math.sin(n*2.1)*0.00013*Math.ceil(n/3+0.01), c.lng+Math.cos(n*2.1)*0.00016*Math.ceil(n/3+0.01)] : [c.lat,c.lng];
-    const m = L.marker(ll,{icon, draggable: UI.moving===c.id, zIndexOffset: inZone?(UI.selected===c.id?1000:500):0, keyboard:true, title:codeOf(c)+' '+(c.nombre||'')});
+    const m = L.marker(ll,{icon, draggable: UI.moving===c.id, zIndexOffset: inZone?(UI.selected===c.id?1000:500):0, keyboard:true, title:codeOf(c)+' '+nomDe(c)});
     m.on('click', ()=>{ if(UI.placing||UI.moving) return; openClient(c.id); });
     if(UI.moving===c.id) m.on('dragend', ev=>{ const p=ev.target.getLatLng(); c.lat=p.lat; c.lng=p.lng; delete c.geoDudosa; delete c.geoNota; queueCampos(c, geoCampos(c)); save(); });
     m.addTo(layer); markers.set(c.id,m);
@@ -1446,7 +1454,7 @@ function openClient(id, tab, quieto){
   const v = isVisited(c);
   const extras = Object.entries(c.extra||{}).filter(([k,val])=>String(val).trim());
   let h = `<span class="codebig" style="--c:${c.baja?'#9aa7ab':zoneColor(c.zona)}">${esc(codeOf(c))}</span>
-  <h2>${esc(c.nombre||'Sin nombre')}</h2>${c.razon && norm(c.razon)!==norm(c.nombre)?`<p class="razon">${esc(c.razon)}</p>`:''}
+  <h2>${esc(nomDe(c)||'Sin nombre')}</h2>${subNombre(c)?`<p class="razon">${esc(subNombre(c))}</p>`:''}
   <span class="zonetag" style="--c:${zoneColor(c.zona)}"><i></i>${c.baja?'No existe más':c.zona!=null?'Día '+(c.zona+1):'Sin día'}</span>
   <p class="sub">${esc(c.direccion)}${c.localidad?', '+esc(c.localidad):''}${c.partido&&norm(c.partido)!==norm(c.localidad)?' ('+esc(c.partido)+')':''}${UI.me&&located(c)?` <b>(a ${kmTo(c)})</b>`:''}</p>${c.geoDudosa?`<p class="pend">Ubicación a revisar: ${esc(c.geoNota||'')}</p>`:''}`;
   const cab = h; h = '';
@@ -1494,14 +1502,14 @@ function openClient(id, tab, quieto){
     if(act==='edit') openForm(c);
     if(act==='resumen') saveResumen(c);
     if(act==='zona') openZonePicker(c);
-    if(act==='baja' && confirm(`¿Ocultar a ${codeOf(c)} ${c.nombre||''} como "No existe más"? Lo podés reactivar desde el menú.`)){ c.baja=true; c.zona=null; queueCampos(c,{estado:'Oculto'}); save(); closeSheet(); render(); toast('Cliente ocultado'); }
+    if(act==='baja' && confirm(`¿Ocultar a ${codeOf(c)} ${nomDe(c)} como "No existe más"? Lo podés reactivar desde el menú.`)){ c.baja=true; c.zona=null; queueCampos(c,{estado:'Oculto'}); save(); closeSheet(); render(); toast('Cliente ocultado'); }
     if(act==='alta'){ c.baja=false; queueCampos(c,{estado:'Activo'}); if(located(c)) assignNearestZone(c); save(); render(); openClient(c.id); toast('Cliente reactivado'); }
     if(act==='move'){ UI.moving=c.id; closeSheet(); render(); showBanner('Arrastrá el pin a su lugar','Listo',()=>{ UI.moving=null; hideBanner(); render(); toast('Ubicación guardada'); }); }
   };
 }
 function openZonePicker(c){
   const k = zoneCount();
-  let h = `<h2>Mover a otro día</h2><p class="sub"><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre||'')} está en ${c.zona!=null?'el Día '+(c.zona+1):'ningún día'}.</p><ul class="list">`;
+  let h = `<h2>Mover a otro día</h2><p class="sub"><span class="code">${esc(codeOf(c))}</span>${esc(nomDe(c))} está en ${c.zona!=null?'el Día '+(c.zona+1):'ningún día'}.</p><ul class="list">`;
   for(let z=0; z<k; z++){
     const cant = S.clients.filter(x=>active(x)&&x.zona===z).length;
     h += `<li style="--c:${zoneColor(z)}" data-to="${z}"><span class="num">${z+1}</span><span class="txt"><b>Día ${z+1}${z===c.zona?' (actual)':''}</b><small>${cant} clientes</small></span></li>`;
@@ -1566,11 +1574,11 @@ function openList(){
     const done = S.clients.filter(c=>active(c) && c.zona===z && isVisited(c));
     h = `<h2>Día ${z+1}</h2><p class="sub">${route.length} pendientes, ${S.plan && S.plan.zona===z && S.plan.dia===diaKey() ? 'en el orden de la ruta planificada' : 'en orden sugerido'}.</p>`;
     if(route.length){
-      h += `<ul class="list">${route.map((c,i)=>`<li style="--c:${zoneColor(z)}" data-id="${c.id}"><span class="num">${i+1}</span><span class="txt"><b><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre||'Sin nombre')}</b><small>${esc(c.direccion)}${c.horario?' | '+esc(c.horario):''}</small></span><button class="tick" data-tick="${c.id}" aria-label="Marcar visitado">✓</button></li>`).join('')}</ul>`;
+      h += `<ul class="list">${route.map((c,i)=>`<li style="--c:${zoneColor(z)}" data-id="${c.id}"><span class="num">${i+1}</span><span class="txt"><b><span class="code">${esc(codeOf(c))}</span>${esc(nomDe(c)||'Sin nombre')}</b><small>${esc(c.direccion)}${c.horario?' | '+esc(c.horario):''}</small></span><button class="tick" data-tick="${c.id}" aria-label="Marcar visitado">✓</button></li>`).join('')}</ul>`;
       const planHoy = S.plan && S.plan.zona===z && S.plan.dia===diaKey();
       h += `<div class="row"><button class="btn go" id="btnPlan">Planificar ruta</button>${planHoy&&UI.plan&&UI.plan.par.z===z?'<button class="btn" id="btnVerPlan">Ver recorrido de hoy</button>':''}</div>`;
     } else h += `<div class="empty"><p>No quedan clientes pendientes en este día este mes.</p></div>`;
-    if(done.length) h += `<h3>Visitados este mes (${done.length})</h3><ul class="list">${done.map(c=>`<li style="--c:#9aa7ab" data-id="${c.id}"><span class="num">✓</span><span class="txt"><b><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre)}</b><small>${esc(c.direccion)}</small></span></li>`).join('')}</ul>`;
+    if(done.length) h += `<h3>Visitados este mes (${done.length})</h3><ul class="list">${done.map(c=>`<li style="--c:#9aa7ab" data-id="${c.id}"><span class="num">✓</span><span class="txt"><b><span class="code">${esc(codeOf(c))}</span>${esc(nomDe(c))}</b><small>${esc(c.direccion)}</small></span></li>`).join('')}</ul>`;
   }
   openSheet(h);
   const bp=document.getElementById('btnPlan'); if(bp) bp.onclick=openPlan;
@@ -1668,7 +1676,7 @@ document.getElementById('btnList').onclick = ()=> S.clients.length ? openList() 
 function openBajas(){
   const list = S.clients.filter(c=>c.baja);
   openSheet(`<h2>Clientes ocultos (${list.length})</h2><p class="sub">Marcados como "No existe más" o eliminados del mapa. Siguen en la planilla.</p>
-  <ul class="list">${list.map(c=>`<li style="--c:#9aa7ab"><span class="txt"><b><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre)}</b><small>${esc(c.direccion)}</small></span><button class="btn small" data-r="${c.id}">Reactivar</button></li>`).join('')}</ul>`);
+  <ul class="list">${list.map(c=>`<li style="--c:#9aa7ab"><span class="txt"><b><span class="code">${esc(codeOf(c))}</span>${esc(nomDe(c))}</b><small>${esc(c.direccion)}</small></span><button class="btn small" data-r="${c.id}">Reactivar</button></li>`).join('')}</ul>`);
   sheetBody.onclick = e=>{ const b=e.target.closest('[data-r]'); if(!b) return; const c=S.clients.find(x=>x.id===b.dataset.r); c.baja=false; queueCampos(c,{estado:'Activo'}); if(located(c)) assignNearestZone(c); save(); render(); toast('Cliente reactivado'); S.clients.some(x=>x.baja) ? openBajas() : closeSheet(); };
 }
 
@@ -1690,7 +1698,7 @@ function openZoneForm(){
 function openFailed(){
   const sin = S.clients.filter(c=>!located(c)&&active(c));
   const dud = S.clients.filter(c=>located(c)&&active(c)&&c.geoDudosa);
-  const item = (c, dudosa) => `<li style="--c:${dudosa?'#e79a12':'#c2410c'}"><span class="num">${dudosa?'?':'!'}</span><span class="txt"><b><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre)}</b><small>${esc(c.direccion)}${c.localidad?', '+esc(c.localidad):''}${c.partido?' ('+esc(c.partido)+')':''}</small>${c.geoNota?`<small>${esc(c.geoNota)}</small>`:''}</span>
+  const item = (c, dudosa) => `<li style="--c:${dudosa?'#e79a12':'#c2410c'}"><span class="num">${dudosa?'?':'!'}</span><span class="txt"><b><span class="code">${esc(codeOf(c))}</span>${esc(nomDe(c))}</b><small>${esc(c.direccion)}${c.localidad?', '+esc(c.localidad):''}${c.partido?' ('+esc(c.partido)+')':''}</small>${c.geoNota?`<small>${esc(c.geoNota)}</small>`:''}</span>
     <span class="acc">${dudosa?`<button class="btn small" data-v="${c.id}">Ver</button><button class="btn small" data-ok="${c.id}">Está bien</button>`:`<button class="btn small" data-e="${c.id}">Editar</button>`}<button class="btn small" data-p="${c.id}">${dudosa?'Mover':'Ubicar'}</button></span></li>`;
   const pendientesRev = dud.length+sin.length;
   openSheet(`<h2>Ubicaciones a revisar</h2>
@@ -1718,7 +1726,7 @@ function openFailed(){
     if(ed) openForm(cli(ed));
     if(ve){ const c=cli(ve); map.setView([c.lat,c.lng],17); openClient(c.id); }
     if(ok){ const c=cli(ok); delete c.geoDudosa; delete c.geoNota; queueCampos(c, geoCampos(c)); save(); render(); toast('Ubicación confirmada'); openFailed(); }
-    if(pl){ const c=cli(pl); UI.placing=c.id; closeSheet(); if(located(c)) map.setView([c.lat,c.lng],17); showBanner(`Tocá el mapa donde está ${c.nombre||'el cliente'}`,'Cancelar',()=>{UI.placing=null;hideBanner();}); }
+    if(pl){ const c=cli(pl); UI.placing=c.id; closeSheet(); if(located(c)) map.setView([c.lat,c.lng],17); showBanner(`Tocá el mapa donde está ${nomDe(c)||'el cliente'}`,'Cancelar',()=>{UI.placing=null;hideBanner();}); }
   };
 }
 
@@ -1734,7 +1742,7 @@ function mostrarRevision(){
   if(!ids.length || UI.revIdx>=ids.length){ terminarRevision(ids.length?'Revisión terminada':'No quedan ubicaciones para revisar'); return; }
   const c=S.clients.find(x=>x.id===ids[UI.revIdx]);
   UI.selected=c.id; render(); map.setView([c.lat,c.lng],17);
-  bar.innerHTML=`<div class="rv-txt"><small>${UI.revIdx+1} de ${ids.length}</small><b><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre)}</b><small>${esc(c.direccion)}${c.localidad?', '+esc(c.localidad):''}</small></div>
+  bar.innerHTML=`<div class="rv-txt"><small>${UI.revIdx+1} de ${ids.length}</small><b><span class="code">${esc(codeOf(c))}</span>${esc(nomDe(c))}</b><small>${esc(c.direccion)}${c.localidad?', '+esc(c.localidad):''}</small></div>
     <div class="rv-acc"><button class="btn go" data-r="ok">Está bien</button><button class="btn" data-r="mover">Mover</button><button class="btn" data-r="saltar">Saltar</button><button class="btn small" data-r="salir">Salir</button></div>`;
   bar.hidden=false; document.body.classList.add('revisando');
   bar.onclick=e=>{
@@ -1743,7 +1751,7 @@ function mostrarRevision(){
     if(r==='ok'){ delete c.geoDudosa; delete c.geoNota; queueCampos(c, geoCampos(c)); save(); UI.revisando.splice(UI.revIdx,1); mostrarRevision(); }
     if(r==='saltar'){ UI.revIdx++; mostrarRevision(); }
     if(r==='salir') terminarRevision();
-    if(r==='mover'){ UI.placing=c.id; bar.innerHTML=`<div class="rv-txt"><b>Tocá el mapa donde está ${esc(c.nombre)}</b></div><div class="rv-acc"><button class="btn" data-r="cancelar">Cancelar</button></div>`;
+    if(r==='mover'){ UI.placing=c.id; bar.innerHTML=`<div class="rv-txt"><b>Tocá el mapa donde está ${esc(nomDe(c))}</b></div><div class="rv-acc"><button class="btn" data-r="cancelar">Cancelar</button></div>`;
       bar.onclick=e2=>{ if(e2.target.closest('[data-r="cancelar"]')){ UI.placing=null; mostrarRevision(); } }; }
   };
 }
@@ -2126,7 +2134,7 @@ function clientesDeScript(lista, visitas){
   const ult = ultimasVisitas(visitas);
   return lista.map(o=>({
     id:uid(), geo:'pending', zona:null, visitado:null, extra:o.extras||{},
-    codigo:o.codigo||'', nombre:o.nombre||'', direccion:o.direccion||'', telefono:o.telefono||'',
+    codigo:o.codigo||'', nombre:o.nombre||'', nombreSis:o.nombreSis||'', direccion:o.direccion||'', telefono:o.telefono||'',
     razon:o.razon||'', localidad:o.localidad||'', partido:o.partido||'', contacto:o.contacto||'', rubro:o.rubro||'', notas:o.notas||'', horario:o.horario||'', plazo:o.plazo||'', medio:o.medio||'',
     ultimaVisita: ult.get(norm(o.codigo)) || ult.get('n:'+norm(o.nombre)) || '',
     _lat:o.lat, _lng:o.lng, _zona:o.zona, _estado:o.estado
@@ -2607,7 +2615,7 @@ const PAL_GENERICAS=/^(ferreteria|ferreteria|pintureria|corralon|bulonera|bulone
 function palabrasNombre(t){ return norm(t).replace(/[^a-z0-9ñ ]/g,' ').split(' ').filter(w=>w.length>=3 && !PAL_GENERICAS.test(w)); }
 function nombreCoincide(c, nom){
   const a=palabrasNombre(nom); if(!a.length) return false;
-  const b=palabrasNombre((c.nombre||'')+' '+(c.razon||''));
+  const b=palabrasNombre((c.nombre||'')+' '+(c.nombreSis||'')+' '+(c.razon||''));
   return a.some(w=>b.some(x=>x===w || (w.length>=5 && (x.startsWith(w)||w.startsWith(x)))));
 }
 async function buscarHorariosOSM(){
@@ -2649,7 +2657,7 @@ function openSugerencias(){
   else {
     h+=`<div class="row"><button class="btn go" id="sgAll">Aceptar ${seguros.length<lista.length?'los seguros':'todos'} (${seguros.length})</button></div>
     ${seguros.length<lista.length?`<p class="hint">Los marcados con ⚠ son comercios pegados al pin pero con otro nombre: aceptalos de a uno si son tu cliente.</p>`:''}<ul class="list">`;
-    h+=lista.map(s=>`<li style="--c:${zoneColor(s.c.zona)}"><span class="txt"><b><span class="code">${esc(codeOf(s.c))}</span>${s.dudoso?'⚠ ':''}${esc(s.c.nombre)}</b><small>${esc(fmtHorario(s.rangos))}</small><small>«${esc(s.fuente.length>110?s.fuente.slice(0,110)+'…':s.fuente)}»</small></span>
+    h+=lista.map(s=>`<li style="--c:${zoneColor(s.c.zona)}"><span class="txt"><b><span class="code">${esc(codeOf(s.c))}</span>${s.dudoso?'⚠ ':''}${esc(nomDe(s.c))}</b><small>${esc(fmtHorario(s.rangos))}</small><small>«${esc(s.fuente.length>110?s.fuente.slice(0,110)+'…':s.fuente)}»</small></span>
       <button class="btn small" data-ok="${s.c.id}">Aceptar</button><button class="btn small" data-ed="${s.c.id}">Editar</button><button class="btn small" data-no="${s.c.id}">Descartar</button></li>`).join('')+'</ul>';
   }
   openSheet(h);
@@ -2861,7 +2869,7 @@ function mostrarPlan(){
     let marca='', extra='';
     if(e.estado==='cerrado'){ marca='<b style="color:var(--warn)">'+(e.llegada>=jornada()[1]-5 ? 'No llegás antes de las '+fmtHM(jornada()[1]) : 'Va a estar cerrado')+'</b>'; extra=`<button class="btn small" data-mv="${c.id}">Pasar a otro día</button>`; }
     else if(e.espera>=5) marca=`<b style="color:var(--warn)">Espera ${Math.round(e.espera)} min (abre ${fmtHM(e.llegada+e.espera)})</b>`;
-    h+=`<li style="--c:${e.estado==='cerrado'?'#c2410c':zoneColor(z)}" data-id="${c.id}"><span class="num">${k+1}</span><span class="txt"><b>${fmtHM(e.llegada)} · <span class="code">${esc(codeOf(c))}</span>${esc(c.nombre)}</b><small>${esc(det)}</small>${marca?'<small>'+marca+'</small>':''}</span>${extra}</li>`;
+    h+=`<li style="--c:${e.estado==='cerrado'?'#c2410c':zoneColor(z)}" data-id="${c.id}"><span class="num">${k+1}</span><span class="txt"><b>${fmtHM(e.llegada)} · <span class="code">${esc(codeOf(c))}</span>${esc(nomDe(c))}</b><small>${esc(det)}</small>${marca?'<small>'+marca+'</small>':''}</span>${extra}</li>`;
   });
   if(pl.fin!=null) h+=`<li style="--c:#2563eb"><span class="num">●</span><span class="txt"><b>${fmtHM(s.llegadaFin)} · Final</b><small>${pl.par.pFin && cfgRuta().casa && Math.abs(pl.par.pFin.lat-cfgRuta().casa.lat)<1e-7 ? 'Mi casa' : 'Punto final'}</small></span></li>`;
   h+=`</ul>`;
@@ -2881,7 +2889,7 @@ function mostrarPlan(){
     if(mv){
       const c=S.clients.find(x=>x.id===mv.dataset.mv), nz=zonaVecina(c);
       if(nz==null){ toast('No hay otro día para moverlo'); return; }
-      if(!confirm(`¿Sacar a ${codeOf(c)} ${c.nombre} de la ruta de hoy y pasarlo al Día ${nz+1}?`)) return;
+      if(!confirm(`¿Sacar a ${codeOf(c)} ${nomDe(c)} de la ruta de hoy y pasarlo al Día ${nz+1}?`)) return;
       c.zona=nz; c.zonaManual=true; queueCampos(c, zonaCampo(c)); save(); toast(`Pasado al Día ${nz+1}`);
       calcularPlan(pl.par); return;
     }
@@ -3061,7 +3069,7 @@ function renderCob(){
       if(d.venc>0) lineas.push(`<span class="t-venc">Vencido ${plata(d.venc)} · hace ${d.atraso} ${d.atraso===1?'día':'días'}</span>`);
       if(d.pv>0) lineas.push(`<span class="t-pv">Por vencer ${plata(d.pv)} · ${d.proxPv===0?'vence hoy':'en '+d.proxPv+' '+(d.proxPv===1?'día':'días')}</span>`);
       if(!lineas.length) lineas.push(`<span class="t-ok">Al día</span>`);
-      return `<li data-id="${c.id}" class="${est}"><div class="sc-top"><span class="sc-nom"><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre)}</span><b>${plata(d.saldo)}</b></div>
+      return `<li data-id="${c.id}" class="${est}"><div class="sc-top"><span class="sc-nom"><span class="code">${esc(codeOf(c))}</span>${esc(nomDe(c))}</span><b>${plata(d.saldo)}</b></div>
         <div class="sc-sub">${lineas.join('')}${filtro!=='hoy'&&c.zona!=null?`<span class="sc-z" style="--c:${zoneColor(c.zona)}">Día ${c.zona+1}</span>`:''}</div></li>`;
     }).join('')+`</ul>`;
   }
@@ -3080,8 +3088,8 @@ function openSearch(){
   sheetBody.onclick = e=>{ const li=e.target.closest('li[data-id]'); if(!li) return; const c=S.clients.find(x=>x.id===li.dataset.id); if(c&&located(c)) map.setView([c.lat,c.lng],16); openClient(li.dataset.id); };
   const q = document.getElementById('q'), out = document.getElementById('qres');
   const run = ()=>{ const t=norm(q.value); if(!t){ out.innerHTML=''; return; }
-    const res = S.clients.filter(c=>norm(codeOf(c)+' '+c.nombre+' '+(c.razon||'')+' '+c.direccion+' '+(c.localidad||'')).includes(t)).slice(0,30);
-    out.innerHTML = res.length ? res.map(c=>`<li data-id="${c.id}" style="--c:${c.baja?'#9aa7ab':zoneColor(c.zona)}"><span class="num">${c.baja?'×':isVisited(c)?'✓':c.zona!=null?c.zona+1:'?'}</span><span class="txt"><b><span class="code">${esc(codeOf(c))}</span>${esc(c.nombre)}</b><small>${esc(c.direccion)}</small></span></li>`).join('') : '<li><span class="txt"><small>Sin resultados</small></span></li>';
+    const res = S.clients.filter(c=>norm(codeOf(c)+' '+c.nombre+' '+(c.nombreSis||'')+' '+(c.razon||'')+' '+c.direccion+' '+(c.localidad||'')).includes(t)).slice(0,30);
+    out.innerHTML = res.length ? res.map(c=>`<li data-id="${c.id}" style="--c:${c.baja?'#9aa7ab':zoneColor(c.zona)}"><span class="num">${c.baja?'×':isVisited(c)?'✓':c.zona!=null?c.zona+1:'?'}</span><span class="txt"><b><span class="code">${esc(codeOf(c))}</span>${esc(nomDe(c))}</b><small>${esc(c.direccion)}</small></span></li>`).join('') : '<li><span class="txt"><small>Sin resultados</small></span></li>';
   };
   q.addEventListener('input', run); setTimeout(()=>q.focus(),250);
 }

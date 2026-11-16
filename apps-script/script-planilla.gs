@@ -27,8 +27,8 @@
  * se actualiza cada mañana junto con las deudas.
  */
 const H_CLIENTES = 'Clientes', H_VISITAS = 'Visitas', H_MAPA = 'Mapa';
-const COLS_CLIENTES = ['Código', 'Nombre', 'Razón social', 'Dirección', 'Localidad', 'Partido', 'Teléfono', 'Contacto', 'Rubro', 'Comentarios', 'Horario', 'Plazo de pago', 'Medio de pago', 'Zona', 'Estado', 'Deuda', 'Última visita', 'Último resumen'];
-const CAMPO_COL = { codigo: 'codigo', nombre: 'nombre', razon: 'razon social', direccion: 'direccion', localidad: 'localidad', partido: 'partido', telefono: 'telefono', contacto: 'contacto', rubro: 'rubro', notas: 'comentarios', horario: 'horario', plazo: 'plazo de pago', medio: 'medio de pago', zona: 'zona', estado: 'estado' };
+const COLS_CLIENTES = ['Código', 'Nombre', 'Nombre en sistema', 'Razón social', 'Dirección', 'Localidad', 'Partido', 'Teléfono', 'Contacto', 'Rubro', 'Comentarios', 'Horario', 'Plazo de pago', 'Medio de pago', 'Zona', 'Estado', 'Deuda', 'Última visita', 'Último resumen'];
+const CAMPO_COL = { codigo: 'codigo', nombre: 'nombre', nombreSis: 'nombre en sistema', razon: 'razon social', direccion: 'direccion', localidad: 'localidad', partido: 'partido', telefono: 'telefono', contacto: 'contacto', rubro: 'rubro', notas: 'comentarios', horario: 'horario', plazo: 'plazo de pago', medio: 'medio de pago', zona: 'zona', estado: 'estado' };
 const H_DEUDAS = 'Deudas', H_COBRADAS = 'Cobradas';
 const SISTEMA = 'https://tresgeventas.com.ar';
 const COLS_VISITAS = ['Fecha', 'Hora', 'Código', 'Nombre', 'Dirección', 'Zona', 'Resumen'];
@@ -287,6 +287,7 @@ function estructura(ss) {
   asegurarHorario(ss);
   const cl = ss.getSheetByName(H_CLIENTES);
   asegurarColumna(cl, 'Razón social', 'nombre', '@');
+  asegurarColumna(cl, 'Nombre en sistema', 'nombre', '@');
   asegurarColumna(cl, 'Localidad', 'direccion', '@');
   asegurarColumna(cl, 'Partido', 'localidad', '@');
   asegurarColumna(cl, 'Plazo de pago', 'horario', '@');
@@ -438,7 +439,27 @@ function loginSistema() {
   const u = UrlFetchApp.fetch(SISTEMA + '/usuario', { headers: { Cookie: textoCookies(jar), 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }, muteHttpExceptions: true });
   let j = null; try { j = JSON.parse(u.getContentText()); } catch (e) {}
   if (!j || !j.clients) throw new Error('No pude iniciar sesión en el sistema: revisá el usuario y la clave');
+  clientesSistema = j.clients;
   return jar;
+}
+
+let clientesSistema = null; // lista de clientes del vendedor que devuelve el sistema al iniciar sesión
+
+// Completa la columna "Nombre en sistema" con el nombre con que cada cliente está dado de alta en el sistema
+// (se busca por el número de cliente). Corre cada mañana con las deudas; también se puede ejecutar desde el editor.
+function actualizarNombresSistema(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  estructura(ss);
+  if (!clientesSistema) loginSistema();
+  const nom = {};
+  (clientesSistema || []).forEach(x => { const n = String(x.name || x.razonSocial || '').replace(/\s+/g, ' ').trim(); if (x.id != null && n) nom[String(x.id).trim()] = n; });
+  const cl = ss.getSheetByName(H_CLIENTES), data = cl.getDataRange().getDisplayValues(), head = data[0].map(norm);
+  const iCod = head.indexOf('codigo'), iNs = head.indexOf('nombre en sistema');
+  if (iCod < 0 || iNs < 0 || data.length < 2) return 0;
+  let cambios = 0;
+  const col = data.slice(1).map(f => { const n = nom[String(f[iCod]).trim()]; if (n && n !== f[iNs]) { cambios++; return [n]; } return [f[iNs]]; });
+  if (cambios) cl.getRange(2, iNs + 1, col.length, 1).setValues(col);
+  return cambios;
 }
 
 // Para probar desde el editor: Ejecutar → probarConexionSistema
@@ -458,6 +479,7 @@ function actualizarDeudas(ss) {
   ss = ss || SpreadsheetApp.getActiveSpreadsheet();
   estructura(ss);
   const jar = loginSistema(), ck = textoCookies(jar);
+  try { actualizarNombresSistema(ss); } catch (e) { Logger.log('Nombres: ' + e); }
   const cl = ss.getSheetByName(H_CLIENTES);
   const data = cl.getDataRange().getDisplayValues();
   const head = data[0].map(norm);
